@@ -1,8 +1,15 @@
-// Message bus between the output page and the controller page.
-// BroadcastChannel is same-origin and same-browser-profile only: no server, no open port,
-// nobody else on the network can listen or send. Files/Blobs can be sent directly.
-export function connect(onMsg){
-  const ch=new BroadcastChannel('projection-mapper-v1');
-  ch.onmessage=e=>{if(e.data&&typeof e.data==='object')onMsg(e.data);};
-  return {send:o=>ch.postMessage(o)};
+// BroadcastChannel connects the output and controller pages in the same browser profile.
+// It does not use a server or expose a network port, and supports sending files and Blobs.
+export function connect(onMessage) {
+  const channel = new BroadcastChannel('projection-mapper-v1');
+
+  channel.onmessage = event => {
+    if (event.data && typeof event.data === 'object') {
+      onMessage(event.data);
+    }
+  };
+
+  return {
+    send: message => channel.postMessage(message)
+  };
 }

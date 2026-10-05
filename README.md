@@ -1,136 +1,172 @@
 # Projection Mapper
 
-A browser-based, two-screen projection mapping video player. The video is warped in real time with WebGL (a true four-corner homography, not a CSS stretch), so you can project onto any quadrilateral surface.
+A browser-based projection-mapping tool for displaying a warped video on a physical surface using a projector. The app keeps a controller page and a fullscreen output page in sync and uses a WebGL homography transform to map the media onto a quadrilateral.
 
-- **Screen 1 (output):** fullscreen WebGL player, sent to the projector.
-- **Screen 2 (controller):** all controls and the corner designer. The output mirrors every change live.
-- **100% client side:** plain HTML, CSS and JavaScript. No backend, no build step, no dependencies.
+The project is entirely client-side: HTML, CSS, and JavaScript only. There is no backend or build step required for the app itself.
 
-## Features
+## What it does
 
-- Four independently draggable corners with a projective warp done in a fragment shader
-- Loop video that plays continuously, plus a **trigger video** that crossfades in on demand
-- Trigger fades the loop out and pauses it, plays the trigger from the start, then fades back and resumes the loop
-- Press **T** (or the button) to trigger; press it again to skip back to the loop
-- Test pattern (grid, crosshair, diagonals, corner labels) rendered through the same warp
-- Save and load named mappings (stored in `localStorage`)
-- Play, pause, restart, loop, seek bar, volume, mute
-- Optional Home Assistant motion sensor trigger
-- Hooks for your own code (see [Custom triggers](#custom-triggers))
+- Warps the loop video and trigger video onto a four-corner mapped surface using WebGL
+- Lets you drag the four corners in the controller UI to match your projection surface
+- Shows a live test pattern for alignment when needed
+- Crossfades between a looping background video and a trigger video
+- Saves named mappings in browser localStorage
+- Optional integration with Home Assistant motion events
+- Keeps the controller and output page synchronized via BroadcastChannel
 
-## How it works
+## How the app is split
 
+- Controller page: `index.html` and `js/controller.js`
+  - Drag corners and edit mapping
+  - Load loop/trigger media
+  - Control playback, volume, and trigger state
+  - Save/load mappings
+  - Optional Home Assistant setup
+- Output page: `output.html` and `js/output.js`
+  - Fullscreen projector display
+  - Receives media and commands from the controller
+  - Renders the warped video in a fullscreen canvas
+
+## Project structure
+
+```text
+.
+├── index.html           Controller UI
+├── output.html          Fullscreen output window
+├── style.css            App styling
+├── js/
+│   ├── controller.js    Controller logic and UI state
+│   ├── output.js        Output page render loop and commands
+│   ├── net.js           BroadcastChannel connection layer
+│   ├── webgl.js         WebGL renderer and shader-based warp
+│   ├── mapping.js       Default calibration data and corner helpers
+│   ├── controls.js      Corner designer and drag logic
+│   ├── video.js         Video element wrapper around playback state
+│   └── storage.js       LocalStorage persistence helpers
+├── package.json
+├── README.md
+└── .git/
 ```
- Controller page (screen 2)                      Output page (screen 1)
- ┌────────────────────────────┐  BroadcastChannel ┌───────────────────────────┐
- │ controls + corner designer │ ───────────────▶ │ <video> -> WebGL texture  │
- │ holds the video files      │ ◀─────────────── │ homography shader -> canvas│
- └────────────────────────────┘      status       └───────────────────────────┘
-```
-
-The two pages talk through the browser's `BroadcastChannel`. It only connects pages of the same origin in the same browser profile, so no port is opened and nobody else can connect or send commands. Video files are passed directly from the controller to the output page.
 
 ## Quick start
 
-ES modules need http, so serve the `public` folder as static files. Bind to localhost so it is only reachable from this machine:
+This app must be served over HTTP because it uses ES modules. The repo is a static site, so any local web server works.
+
+Example using Python:
 
 ```bash
-cd public
+cd /path/to/ProjectionMapping
 python3 -m http.server 8080 --bind 127.0.0.1
 ```
 
-Then:
+Then open:
 
-1. Open <http://localhost:8080/> on screen 2 (the controller).
-2. Click **Open Output Screen**, drag that window to the projector and **click it once**. This enters fullscreen and enables audio. `F` toggles fullscreen.
-3. **Load Loop Video** and **Load Trigger Video** on the controller.
-4. Drag the four orange corners in the designer until the image fits your surface. Use **Test Pattern** and **Grid** to help.
-5. **Save Mapping** to keep it. Pick it from the dropdown and press **Load Mapping** later.
+1. `http://localhost:8080/` on the main controller screen
+2. Click `Open Output Screen` in the controller UI
+3. Drag that output window to the projector and click it once to enable audio and fullscreen
 
-Any static host works too (GitHub Pages, nginx, etc.). Opening `index.html` straight from disk does not work because browsers block ES modules on `file://`.
+> Opening the files directly with `file://` is not supported because browser module loading is blocked.
 
-## Controls
+## Controller controls
 
-| Control | Action |
-| --- | --- |
-| Load Loop Video / Load Trigger Video | Pick local video files (MP4, WebM, MOV if your browser decodes it) |
-| Trigger / Skip (T) | Start the trigger video; press again to skip back to the loop |
-| Test Pattern | Show the alignment pattern on the output |
-| Grid | Show guide lines in the designer |
-| Reset Mapping | Put the corners back to the default rectangle |
-| Play / Restart / Loop / seek bar | Control the loop video |
-| Mute / volume | Applies to both videos |
-| Save / Load Mapping | Named mappings in `localStorage` |
-| Open Output Screen | Opens the output window |
-| Space | Play / pause the loop video |
+The controller is the main UI for mapping and playback:
 
-The designer has the same aspect ratio as the output screen. It shows the quad outline and optional grid, not a live video preview.
+- Load Loop Video
+- Load Trigger Video
+- Trigger / Skip (`T`)
+- Test Pattern
+- Grid
+- Reset Mapping
+- Play / Restart
+- Loop toggle
+- Seek bar and time display
+- Mute and volume slider
+- Save Mapping / Load Mapping
+- Open Output Screen
+- Home Assistant settings
 
-## Trigger behaviour
+The overlay designer draws the quadrilateral and optional grid in the aspect ratio of the projector output, but it does not show a live media preview.
 
-1. The loop video fades out and the trigger video fades in (0.6 s by default).
-2. When the fade-in finishes, the loop video pauses.
-3. The trigger video plays once from the start. Every trigger restarts it.
-4. When it ends (or you skip), the loop video resumes and the display fades back to it.
+## Trigger behavior
 
-## Custom triggers
+The trigger flow implemented in the code is:
 
-On the controller page, `window.projectionMapper` exposes:
+1. Loop video fades out
+2. Trigger video fades in
+3. Loop video pauses while trigger plays
+4. Trigger restarts from the beginning each time it is triggered
+5. Trigger ends or is skipped, then the loop resumes and fades back in
+
+Default fade time is `0.6` seconds and can be changed from the controller API.
+
+## Custom API hooks
+
+The controller exposes a `window.projectionMapper` object for external control:
 
 ```js
-projectionMapper.trigger();        // (re)start the trigger video, always from the beginning
-projectionMapper.toggleTrigger();  // same as pressing T: skip if showing, otherwise trigger
-projectionMapper.skip();           // fade back to the loop video
-projectionMapper.fadeTime = 1.5;   // crossfade length in seconds
-projectionMapper.isTriggering();   // true while the trigger is fading in, playing or fading out
+window.projectionMapper.trigger();
+window.projectionMapper.toggleTrigger();
+window.projectionMapper.skip();
+window.projectionMapper.fadeTime = 1.5;
+window.projectionMapper.isTriggering();
 ```
 
-Or by event:
+There are also custom events:
 
 ```js
 window.dispatchEvent(new Event('projectionmapper:trigger'));
 window.dispatchEvent(new Event('projectionmapper:toggle'));
 ```
 
-## Home Assistant (optional)
+## Home Assistant integration
 
-Click **Home Assistant** on the controller and enter:
+The app can optionally connect to Home Assistant using a websocket connection.
 
-- WebSocket URL, e.g. `ws://homeassistant.local:8123/api/websocket`
-- A long-lived access token
-- The motion entity, e.g. `binary_sensor.front_motion`
+Required settings:
 
-When the entity changes from `off` to `on`, the trigger fires (unless one is already running). The settings, including the token, are stored in this browser's `localStorage`. Use `wss://` if the page is served over https.
+- WebSocket URL, for example `ws://homeassistant.local:8123/api/websocket` or `wss://homeassistant.local:8123/api/websocket`
+- Long-lived access token
+- Motion entity such as `binary_sensor.front_motion`
 
-## Project structure
+The app now prefers the secure websocket scheme when the page is running over HTTPS, but the URL can still be set manually to match your Home Assistant deployment. When the configured entity changes from `off` to `on`, the trigger fires unless one is already in progress. The settings are saved in browser localStorage.
 
+## Storage and saved mappings
+
+Mappings are saved in browser localStorage under the app namespace. The code stores:
+
+- current mapping
+- selected mapping name
+- loop state
+- volume
+- Home Assistant settings
+
+This means the controller remembers mapping, volume, and loop state between reloads on the same browser profile.
+
+## Communication model
+
+Controller and output communicate using `BroadcastChannel`:
+
+```text
+Controller page  <---->  Output page
+    BroadcastChannel
 ```
-public/
-├── index.html        controller page (screen 2)
-├── output.html       output page (screen 1)
-├── style.css
-├── image/            favicons and manifest
-└── js/
-    ├── controller.js controls, state, Home Assistant, API hooks
-    ├── output.js     rendering loop, fade/trigger state machine
-    ├── net.js        BroadcastChannel wrapper
-    ├── webgl.js      WebGL renderer (homography shader, layer blending)
-    ├── mapping.js    corner data and projective weights
-    ├── controls.js   designer overlay and corner dragging
-    ├── video.js      video element wrapper
-    └── storage.js    localStorage helpers
-```
+
+This is same-origin and same-browser-profile only; it does not open a network port and it does not expose the app to other machines. Media files are transferred directly between pages using the browser message channel.
 
 ## Notes and limitations
 
-- Both pages must be in the same browser profile (not incognito vs. normal, not two different browsers), so they run on the same computer with a window on each monitor.
-- Keep the controller open. It holds the video files and re-sends them if you reload the output page. After reloading the controller, load the videos again. Mapping, loop and volume are remembered.
-- Browsers block audible autoplay until you interact with a page, which is why the output asks for one click. If sound is still blocked, the video starts muted.
-- Developed and tested for Chromium browsers (Chrome, Edge). Firefox is not a target.
-- Videos must be in a format the browser can decode. H.264 MP4 and WebM are safest.
+- Both pages must be in the same browser profile and same origin.
+- The controller should stay open; it owns the media files and resends them if the output reloads.
+- Audio is only enabled after the user interacts with the output page; otherwise the page may start muted.
+- Video compatibility depends on the browser codec support. H.264 MP4 and WebM are the safest options.
+- The project is designed primarily for Chromium-based browsers such as Chrome and Edge.
 
 ## Security
 
-- No server, no listening port. `BroadcastChannel` is limited to same-origin pages in the same browser profile.
-- Serve with `--bind 127.0.0.1` so the static files are only available locally.
-- The Home Assistant token lives in `localStorage` on the controller. Treat that browser profile accordingly.
+- No server is required for the app itself.
+- `BroadcastChannel` stays within the same browser profile and origin.
+- If you enable Home Assistant, keep the access token in a trusted browser profile and avoid sharing the session.
+
+## Starting from the repo root
+
+This repo is intentionally a static front-end project. For local use, serve the repo root directly rather than a `public/` folder because the actual files live in the project root.
