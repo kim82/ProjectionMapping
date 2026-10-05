@@ -399,7 +399,7 @@ getElement('seek').oninput = event => {
   sendCommand('seek', { p: event.target.value / 1000 });
 };
 getElement('out-status').onclick = () => {
-  window.open('/output.html', 'pm-output', 'popup,width=960,height=540');
+  window.open('output.html', 'pm-output', 'popup,width=960,height=540');
 };
 
 function refreshSavedMappings() {
