@@ -1,7 +1,7 @@
-import { Renderer } from './webgl.js';
-import { VideoSource } from './video.js';
-import { DEFAULT } from './mapping.js';
-import { connect } from './net.js';
+import { Renderer } from './webgl.js?v=20261005';
+import { VideoSource } from './video.js?v=20261005';
+import { DEFAULT } from './mapping.js?v=20261005';
+import { connect } from './net.js?v=20261005';
 
 const getElement = id => document.getElementById(id);
 

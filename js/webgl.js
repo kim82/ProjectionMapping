@@ -1,4 +1,4 @@
-import { quadQ, toArray } from './mapping.js';
+import { quadQ, toArray } from './mapping.js?v=20261005';
 
 const VERTEX_SHADER = `
 attribute vec2 aPos;

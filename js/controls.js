@@ -1,4 +1,4 @@
-import { KEYS } from './mapping.js';
+import { KEYS } from './mapping.js?v=20261005';
 
 // Draws the calibration overlay and lets users drag its normalized corner handles.
 export class Calibration {

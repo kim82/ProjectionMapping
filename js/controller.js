@@ -1,7 +1,7 @@
-import { connect } from './net.js';
-import { DEFAULT, clone } from './mapping.js';
-import { Calibration } from './controls.js';
-import * as store from './storage.js';
+import { connect } from './net.js?v=20261005';
+import { DEFAULT, clone } from './mapping.js?v=20261005';
+import { Calibration } from './controls.js?v=20261005';
+import * as store from './storage.js?v=20261005';
 
 const getElement = id => document.getElementById(id);
 const formatTime = seconds => Number.isFinite(seconds)
