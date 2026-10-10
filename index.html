@@ -19,35 +19,33 @@
             <span id="ha-status-text">Home Assistant Disconnected</span>
         </span>
     </header>
-    <main id="stage"><canvas id="overlay"></canvas>
+    <main id="stage">
+        <canvas id="overlay"></canvas>
         <div id="error" hidden></div>
     </main>
     <section id="panel">
         <div class="row">
-            <button id="load">Load Loop Video</button><input id="file" type="file" accept="video/*" hidden>
-            <button id="loadtrig">Load Trigger Video</button><input id="file2" type="file" accept="video/*" hidden>
-            <button id="trigger">Trigger / Skip (T)</button>
-            <button id="grid" class="toggle">Grid</button>
+            <button id="load">Load Loop...</button><input id="file" type="file" accept="video/*" hidden>
+            <button id="loadtrig">Load Trigger...</button><input id="file2" type="file" accept="video/*" hidden>
             <button id="test" class="toggle">Test Pattern</button>
-            <button id="mirror" class="toggle" aria-pressed="false">Mirror Video</button>
-            <button id="rotate" type="button" aria-label="Rotate video 90 degrees">Rotate Video</button>
-            <button id="reset">Reset Mapping</button>
+            <button id="mirror" class="toggle" aria-pressed="false">⮀ Mirror Video</button>
+            <button id="rotate" type="button" aria-label="Rotate video 90 degrees">⭯ Rotate Video</button>
+            <button id="reset">🗑 Reset Mapping</button>
         </div>
         <div class="row">
-            <button id="play">Play</button><button id="restart">Restart</button>
-            <button id="loop" class="toggle">Loop</button>
+        </div>
+        <div class="row">
+            <button id="trigger" title="Play the trigger video (T)">Trigger (T)</button>
+            <button id="play" title="Play">▶</button>
+            <button id="restart" title="Restart video">⏮</button>
+            <button id="loop" class="toggle" title="Loop video">⟳</button>
             <input id="seek" type="range" min="0" max="1000" value="0"><span id="time">0:00 / 0:00</span>
         </div>
         <div class="row">
-            <button id="mute">Mute</button><input id="vol" type="range" min="0" max="1" step="0.01" value="1">
-            <label for="triggerDelay">Trigger Delay (seconds)</label>
-            <input id="triggerDelay" type="number" min="0" max="60" value="0">
-            <div style="display:none">
-                <!-- Hidden mapping controls for future use -->
-                <select id="maps"></select>
-                <button id="save">Save Mapping</button>
-                <button id="loadmap">Load Mapping</button>
-            </div>
+            <button id="mute">🔈</button>
+            <input id="vol" type="range" min="0" max="1" step="0.01" value="1">
+            <label for="triggerDelay" id="triggerDelayLabel">Trigger Delay (0)</label>
+            <input id="triggerDelay" type="range" min="0" max="60" step="1" value="0">
         </div>
     </section>
     <dialog id="ha-dialog">

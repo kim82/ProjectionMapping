@@ -32,15 +32,15 @@ function writeStorage(value) {
 export const getState = () => readStorage();
 export const setState = updates => writeStorage({ ...readStorage(), ...updates });
 
-export function saveNamed(name, mapping) {
-  const state = readStorage();
-  state.maps = { ...(state.maps || {}), [name]: mapping };
-  state.name = name;
-  writeStorage(state);
-}
+// export function saveNamed(name, mapping) {
+//   const state = readStorage();
+//   state.maps = { ...(state.maps || {}), [name]: mapping };
+//   state.name = name;
+//   writeStorage(state);
+// }
 
 export const listNamed = () => Object.keys(readStorage().maps || {});
-export const getNamed = name => (readStorage().maps || {})[name];
+// export const getNamed = name => (readStorage().maps || {})[name];
 
 export function getHASettings() {
   const state = readStorage();

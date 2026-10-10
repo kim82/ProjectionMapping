@@ -80,7 +80,7 @@ function showMediaNames() {
   getElement('status').textContent = ['loop', 'trigger']
     .filter(slot => mediaNames[slot])
     .map(slot => `${slot}: ${mediaNames[slot].name}`)
-    .join('   |   ');
+    .join(' | ');
 }
 
 function fitCalibrationOverlay() {
@@ -103,9 +103,9 @@ function fitCalibrationOverlay() {
 }
 
 function renderOutputStatus() {
-  getElement('play').textContent = outputStatus.paused === false ? 'Pause' : 'Play';
+  getElement('play').textContent = outputStatus.paused === false ? '⏸' : '▶';
   setToggle('test', outputStatus.test);
-  setToggle('mute', outputStatus.muted);
+  getElement('mute').innerText = outputStatus.muted ? "🔇" : "🔈";
   setToggle('trigger', outputStatus.state && outputStatus.state !== 'idle');
 
   if (outputStatus.duration) {
@@ -351,11 +351,11 @@ getElement('rotate').onclick = () => {
   );
   sendCommand('rotate', { degrees: controllerState.videoRotationDegrees });
 };
-getElement('grid').onclick = () => {
-  calibration.showGrid = !calibration.showGrid;
-  setToggle('grid', calibration.showGrid);
-  calibration.draw();
-};
+// getElement('grid').onclick = () => {
+//   calibration.showGrid = !calibration.showGrid;
+//   setToggle('grid', calibration.showGrid);
+//   calibration.draw();
+// };
 getElement('reset').onclick = () => {
   mapping = clone(DEFAULT);
   store.setState({ mapping });
@@ -372,11 +372,15 @@ getElement('loop').onclick = () => {
   store.setState({ loop: isLoopEnabled });
   sendCommand('loop', { on: isLoopEnabled });
 };
-getElement('mute').onclick = () => sendCommand('mute', { on: !outputStatus.muted });
+getElement('mute').onclick = () => {
+  sendCommand('mute', { on: !outputStatus.muted });
+  getElement('mute').innerText = outputStatus.muted ? "🔇" : "🔈";
+}
 getElement('vol').oninput = event => {
   const volume = +event.target.value;
   store.setState({ volume });
   sendCommand('volume', { v: volume });
+  getElement('vol').title = parseInt(volume  * 100); 
 };
 
 getElement('triggerDelay').value = controllerState.triggerDelay;
@@ -384,6 +388,7 @@ getElement('triggerDelay').oninput = event => {
   const delaySec = Number(event.target.value) || 0;
   store.setState({ triggerDelay: delaySec });
   sendCommand('triggerDelay', { s: delaySec });
+  getElement('triggerDelayLabel').innerText = "Trigger delay (" + delaySec + ")"; 
 };
 
 getElement('seek').addEventListener('pointerdown', () => {
@@ -401,42 +406,6 @@ getElement('seek').oninput = event => {
 getElement('out-status').onclick = () => {
   window.open('output.html', 'pm-output', 'popup,width=960,height=540');
 };
-
-function refreshSavedMappings() {
-  const select = getElement('maps');
-  select.innerHTML = '';
-
-  for (const name of store.listNamed()) {
-    const option = document.createElement('option');
-    option.textContent = name;
-    select.append(option);
-  }
-
-  const currentName = store.getState().name;
-  if (currentName) select.value = currentName;
-}
-
-getElement('save').onclick = () => {
-  const name = prompt('Mapping name:', getElement('maps').value || 'Mapping 1');
-  if (!name) return;
-
-  store.saveNamed(name, clone(mapping));
-  refreshSavedMappings();
-  getElement('maps').value = name;
-};
-
-getElement('loadmap').onclick = () => {
-  const selectedName = getElement('maps').value;
-  const savedMapping = store.getNamed(selectedName);
-  if (!savedMapping) return;
-
-  mapping = clone(savedMapping);
-  store.setState({ mapping, name: selectedName });
-  calibration.draw();
-  sendCommand('mapping', { mapping });
-};
-
-refreshSavedMappings();
 
 window.addEventListener('projectionmapper:trigger', () => sendCommand('trigger'));
 window.addEventListener('projectionmapper:toggle', () => sendCommand('toggle'));
@@ -462,6 +431,7 @@ window.addEventListener('keydown', event => {
     && !isFormControl
   ) {
     sendCommand('toggle');
+    event.preventDefault();
   }
 
   if (event.key === ' ' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(event.target.tagName)) {
@@ -472,7 +442,7 @@ window.addEventListener('keydown', event => {
 
 window.addEventListener('resize', fitCalibrationOverlay);
 setToggle('loop', controllerState.loop);
-setToggle('grid', calibration.showGrid);
+// setToggle('grid', calibration.showGrid);
 setToggle('mirror', controllerState.mirrorHorizontal);
 getElement('mirror').setAttribute('aria-pressed', String(controllerState.mirrorHorizontal));
 getElement('rotate').setAttribute(
@@ -480,6 +450,8 @@ getElement('rotate').setAttribute(
   `Rotate video 90 degrees; current rotation ${controllerState.videoRotationDegrees} degrees`
 );
 getElement('vol').value = controllerState.volume;
+getElement('vol').title = parseInt(controllerState.volume  * 100);
+getElement('triggerDelayLabel').innerText = "Trigger delay (" + controllerState.triggerDelay + ")";
 sendInitialState();
 setOutputConnectionStatus(false, 'Output screen not connected');
 setHomeAssistantStatus(false, 'Home Assistant Disconnected');

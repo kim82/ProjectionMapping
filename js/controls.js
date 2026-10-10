@@ -20,6 +20,37 @@ export class Calibration {
     };
     canvas.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('keydown', event => this.onKeyDown(event));
+  }
+
+  // User arrow keys to move the selected (hovered) corner
+  onKeyDown(event) {
+    var stepSize = 0.001;
+    
+    if (this.hoveredCorner != null) {
+      var xMapping = this.getMapping()[this.hoveredCorner][0];
+      var yMapping = this.getMapping()[this.hoveredCorner][1];
+      switch (event.key) {
+        case 'ArrowUp':
+          yMapping -= stepSize;
+          break;
+        case 'ArrowDown':
+          yMapping += stepSize;
+          break;
+        case 'ArrowLeft':
+          xMapping -= stepSize;
+          break;
+        case 'ArrowRight':
+          xMapping += stepSize;
+          break;
+      }
+      this.getMapping()[this.hoveredCorner] = [
+        Math.min(1, Math.max(0, xMapping)),
+        Math.min(1, Math.max(0, yMapping))
+      ];
+      this.onChange();
+      event.preventDefault();
+    }
   }
 
   getNormalizedPosition(event) {
@@ -54,7 +85,7 @@ export class Calibration {
   onPointerDown(event) {
     const corner = this.getCornerAtPointer(event);
     if (!corner) return;
-
+    
     this.activeCorner = corner;
     this.canvas.setPointerCapture(event.pointerId);
     event.preventDefault();
