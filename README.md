@@ -4,6 +4,8 @@ A browser-based projection-mapping tool for displaying a warped video on a physi
 
 The project is entirely client-side: HTML, CSS, and JavaScript only. There is no backend or build step required for the app itself.
 
+Disclosure: This project was built using AI (GitHub copilot)
+
 ## What it does
 
 - Warps the loop video and trigger video onto a four-corner mapped surface using WebGL
