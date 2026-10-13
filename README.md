@@ -4,15 +4,17 @@ A browser-based projection-mapping tool for displaying a warped video on a physi
 
 The project is entirely client-side: HTML, CSS, and JavaScript only. There is no backend or build step required for the app itself.
 
+### Disclosure
+This project was built using AI (GitHub copilot)
+
 ## What it does
 
 - Warps the loop video and trigger video onto a four-corner mapped surface using WebGL
 - Lets you drag the four corners in the controller UI to match your projection surface
 - Shows a live test pattern for alignment when needed
 - Crossfades between a looping background video and a trigger video
-- Saves named mappings in browser localStorage
+- Saves settings in browser localStorage
 - Optional integration with Home Assistant motion events
-- Keeps the controller and output page synchronized via BroadcastChannel
 
 ## How the app is split
 
@@ -20,7 +22,6 @@ The project is entirely client-side: HTML, CSS, and JavaScript only. There is no
   - Drag corners and edit mapping
   - Load loop/trigger media
   - Control playback, volume, and trigger state
-  - Save/load mappings
   - Optional Home Assistant setup
 - Output page: `output.html` and `js/output.js`
   - Fullscreen projector display
@@ -73,9 +74,8 @@ The controller is the main UI for mapping and playback:
 
 - Load Loop Video
 - Load Trigger Video
-- Trigger / Skip (`T`)
+- Trigger (`T`)
 - Test Pattern
-- Grid
 - Reset Mapping
 - Play / Restart
 - Loop toggle
@@ -98,7 +98,7 @@ The trigger flow implemented in the code is:
 4. Trigger restarts from the beginning each time it is triggered
 5. Trigger ends or is skipped, then the loop resumes and fades back in
 
-Default fade time is `0.6` seconds and can be changed from the controller API.
+Default fade time is `0` seconds and can be changed from the controller API.
 
 ## Custom API hooks
 
@@ -148,11 +148,6 @@ This means the controller remembers mapping, volume, and loop state between relo
 ## Communication model
 
 Controller and output communicate using `BroadcastChannel`:
-
-```text
-Controller page  <---->  Output page
-    BroadcastChannel
-```
 
 This is same-origin and same-browser-profile only; it does not open a network port and it does not expose the app to other machines. Media files are transferred directly between pages using the browser message channel.
 
