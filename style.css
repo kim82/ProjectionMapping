@@ -91,6 +91,12 @@ h1 {
     align-items: center
 }
 
+.groupLabel {
+    display: flex;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
 button,
 select,
 input {
@@ -141,7 +147,7 @@ input[type=range] {
     accent-color: var(--acc)
 }
 
-.ha-indicator {
+.widget {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -149,10 +155,16 @@ input[type=range] {
     border-radius: 999px;
     border: 1px solid var(--line);
     background: rgba(255, 255, 255, .02);
-    margin-left: auto
+    /*margin-left: auto;*/
+    font-size: 12px;
+    cursor: pointer;
+}
+.widgetgroup.right {
+    right: 10px;
+    position: absolute;
 }
 
-.ha-indicator.connected {
+.widget.connected {
     border-color: rgba(35, 209, 139, .7);
     background: rgba(35, 209, 139, .12)
 }
@@ -268,12 +280,6 @@ body.projection #stage {
 
 #error[hidden] {
     display: none
-}
-
-#out-status, #ha-status-text {
-    font-size: 12px;
-    margin-left: auto;
-    cursor: pointer;
 }
 
 #trigger.on {

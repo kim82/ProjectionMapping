@@ -13,6 +13,8 @@ const normalizeRotation = degrees => Number.isFinite(degrees)
   : 0;
 
 const savedState = store.getState();
+const savedHASettings = store.getHASettings();
+const loopVideoSensorConfigured = !!savedHASettings.loopVideoEntity;
 let mapping = savedState.mapping ? clone(savedState.mapping) : clone(DEFAULT);
 let outputStatus = {};
 let mediaNames = {};
@@ -21,11 +23,14 @@ let outputScreenSize = { w: 16, h: 9 };
 let mappingUpdatePending = false;
 
 const controllerState = {
-  loop: !!savedState.loop,
+  loop: !!savedState.loop && !loopVideoSensorConfigured,
+  loopVideoAutoplay: !loopVideoSensorConfigured,
   volume: savedState.volume ?? 1,
-  muted: false,
+  loopMuted: !!savedState.loopMuted,
+  triggerMuted: !!savedState.triggerMuted,
   fadeTime: 0.6,
   triggerDelay: savedState.triggerDelay ?? 0,
+  loopVideoTriggerDelay: savedState.loopVideoTriggerDelay ?? 0,
   mirrorHorizontal: !!savedState.mirrorHorizontal,
   videoRotationDegrees: normalizeRotation(savedState.videoRotationDegrees),
   test: false
@@ -34,10 +39,13 @@ const mediaFiles = {};
 const commandStateFields = {
   mapping: ['mapping', 'mapping'],
   loop: ['loop', 'on'],
+  loopAutoplay: ['loopVideoAutoplay', 'on'],
   volume: ['volume', 'v'],
-  mute: ['muted', 'on'],
+  loopMute: ['loopMuted', 'on'],
+  triggerMute: ['triggerMuted', 'on'],
   fade: ['fadeTime', 's'],
   triggerDelay: ['triggerDelay', 's'],
+  loopVideoTriggerDelay: ['loopVideoTriggerDelay', 's'],
   mirror: ['mirrorHorizontal', 'on'],
   rotate: ['videoRotationDegrees', 'degrees']
 };
@@ -77,10 +85,15 @@ function setOutputConnectionStatus(isConnected, message) {
 }
 
 function showMediaNames() {
-  getElement('status').textContent = ['loop', 'trigger']
-    .filter(slot => mediaNames[slot])
-    .map(slot => `${slot}: ${mediaNames[slot].name}`)
-    .join(' | ');
+  if (mediaNames['loop'] != undefined) {
+    getElement('load').textContent = "Loop: " + mediaNames['loop'].name;
+    getElement('load').classList.add('connected');
+  }
+  
+  if (mediaNames['trigger'] != undefined) {
+    getElement('loadtrig').textContent = "Trigger: " + mediaNames['trigger'].name;
+    getElement('loadtrig').classList.add('connected');
+  }
 }
 
 function fitCalibrationOverlay() {
@@ -105,7 +118,10 @@ function fitCalibrationOverlay() {
 function renderOutputStatus() {
   getElement('play').textContent = outputStatus.paused === false ? '⏸' : '▶';
   setToggle('test', outputStatus.test);
-  getElement('mute').innerText = outputStatus.muted ? "🔇" : "🔈";
+  const loopMuted = outputStatus.loopMuted ?? controllerState.loopMuted;
+  const triggerMuted = outputStatus.triggerMuted ?? controllerState.triggerMuted;
+  getElement('mute').innerText = loopMuted ? '🔇' : '🔈';
+  getElement('triggerMute').innerText = triggerMuted ? '🔇' : '🔈';
   setToggle('trigger', outputStatus.state && outputStatus.state !== 'idle');
 
   if (outputStatus.duration) {
@@ -160,7 +176,7 @@ function setHomeAssistantStatus(isConnected, message) {
   const ledElement = getElement('ha-led');
   const statusText = getElement('ha-status-text');
   const connected = !!isConnected;
-
+  
   statusElement.classList.toggle('connected', connected);
   ledElement.classList.toggle('connected', connected);
   statusText.textContent = message || (connected ? 'HA Connected' : 'HA Disconnected');
@@ -173,11 +189,29 @@ function showMotionDetected() {
   window.__haMotionBlink = setTimeout(() => motionLed.classList.remove('motion'), 5000);
 }
 
+function updateLoopVideoSensorMode(isConfigured) {
+  controllerState.loopVideoAutoplay = !isConfigured;
+  const loopToggle = getElement('loop');
+  loopToggle.disabled = isConfigured;
+  loopToggle.title = isConfigured
+    ? 'Loop video sensor is configured; loop playback is disabled'
+    : 'Loop video';
+
+  if (isConfigured) {
+    controllerState.loop = false;
+    store.setState({ loop: false });
+    setToggle('loop', false);
+    sendCommand('loop', { on: false });
+  }
+  sendCommand('loopAutoplay', { on: controllerState.loopVideoAutoplay });
+}
+
 function fillHomeAssistantForm() {
   const settings = store.getHASettings();
   getElement('ha-url').value = settings.url;
   getElement('ha-token').value = settings.token;
   getElement('ha-motion-entity').value = settings.motionEntity;
+  getElement('ha-loop-video-entity').value = settings.loopVideoEntity || '';
 }
 
 function openHomeAssistantSettings() {
@@ -200,17 +234,24 @@ function saveHomeAssistantSettings(event) {
   const settings = {
     url: getElement('ha-url').value.trim(),
     token: getElement('ha-token').value.trim(),
-    motionEntity: getElement('ha-motion-entity').value.trim()
+    motionEntity: getElement('ha-motion-entity').value.trim(),
+    loopVideoEntity: getElement('ha-loop-video-entity').value.trim()
   };
 
-  console.log(settings.motionEntity);
   if (!settings.url || !settings.token || !settings.motionEntity) {
     alert('Please enter the Home Assistant WebSocket URL, access token, and motion entity.');
     return;
   }
 
   store.saveHASettings(settings);
+  updateLoopVideoSensorMode(!!settings.loopVideoEntity);
   closeHomeAssistantSettings();
+  clearTimeout(homeAssistantReconnectTimer);
+  if (homeAssistantSocket) {
+    homeAssistantSocket.onclose = null;
+    homeAssistantSocket.close();
+    homeAssistantSocket = null;
+  }
   connectToHomeAssistant();
 }
 
@@ -239,6 +280,15 @@ function handleMotionDetected() {
   console.log('Motion detected! Triggering projection.');
   showMotionDetected();
   if (projection && typeof projection.trigger === 'function') projection.trigger();
+}
+
+function handleLoopVideoSensorDetected() {
+  console.log('Loop video sensor detected. Triggering loop video.');
+  showMotionDetected();
+  const projection = window.projectionMapper;
+  if (projection && typeof projection.loopVideoTrigger === 'function') {
+    projection.loopVideoTrigger();
+  }
 }
 
 function connectToHomeAssistant() {
@@ -297,6 +347,14 @@ function connectToHomeAssistant() {
 
       if (entityId === settings.motionEntity && newState === 'on' && oldState !== 'on') {
         handleMotionDetected();
+      }
+      if (
+        settings.loopVideoEntity
+        && entityId === settings.loopVideoEntity
+        && newState === 'on'
+        && oldState !== 'on'
+      ) {
+        handleLoopVideoSensorDetected();
       }
     }
   };
@@ -373,9 +431,19 @@ getElement('loop').onclick = () => {
   sendCommand('loop', { on: isLoopEnabled });
 };
 getElement('mute').onclick = () => {
-  sendCommand('mute', { on: !outputStatus.muted });
-  getElement('mute').innerText = outputStatus.muted ? "🔇" : "🔈";
-}
+  const isMuted = outputStatus.loopMuted ?? controllerState.loopMuted;
+  const nextMuted = !isMuted;
+  store.setState({ loopMuted: nextMuted });
+  sendCommand('loopMute', { on: nextMuted });
+  getElement('mute').innerText = nextMuted ? '🔇' : '🔈';
+};
+getElement('triggerMute').onclick = () => {
+  const isMuted = outputStatus.triggerMuted ?? controllerState.triggerMuted;
+  const nextMuted = !isMuted;
+  store.setState({ triggerMuted: nextMuted });
+  sendCommand('triggerMute', { on: nextMuted });
+  getElement('triggerMute').innerText = nextMuted ? '🔇' : '🔈';
+};
 getElement('vol').oninput = event => {
   const volume = +event.target.value;
   store.setState({ volume });
@@ -388,7 +456,15 @@ getElement('triggerDelay').oninput = event => {
   const delaySec = Number(event.target.value) || 0;
   store.setState({ triggerDelay: delaySec });
   sendCommand('triggerDelay', { s: delaySec });
-  getElement('triggerDelayLabel').innerText = "Trigger delay (" + delaySec + ")"; 
+  getElement('triggerDelayLabel').innerText = "Video delay (" + delaySec + ")";
+};
+
+getElement('loopVideoTriggerDelay').value = controllerState.loopVideoTriggerDelay;
+getElement('loopVideoTriggerDelay').oninput = event => {
+  const delaySec = Number(event.target.value) || 0;
+  store.setState({ loopVideoTriggerDelay: delaySec });
+  sendCommand('loopVideoTriggerDelay', { s: delaySec });
+  getElement('loopVideoTriggerDelayLabel').innerText = `Video delay (${delaySec})`;
 };
 
 getElement('seek').addEventListener('pointerdown', () => {
@@ -411,6 +487,7 @@ window.addEventListener('projectionmapper:trigger', () => sendCommand('trigger')
 window.addEventListener('projectionmapper:toggle', () => sendCommand('toggle'));
 window.projectionMapper = {
   trigger: () => sendCommand('trigger'),
+  loopVideoTrigger: () => sendCommand('loopVideoTrigger'),
   toggleTrigger: () => sendCommand('toggle'),
   skip: () => sendCommand('skip'),
   stopTrigger: () => sendCommand('skip'),
@@ -451,7 +528,16 @@ getElement('rotate').setAttribute(
 );
 getElement('vol').value = controllerState.volume;
 getElement('vol').title = parseInt(controllerState.volume  * 100);
-getElement('triggerDelayLabel').innerText = "Trigger delay (" + controllerState.triggerDelay + ")";
+getElement('triggerDelayLabel').innerText =
+  `Video delay (${controllerState.triggerDelay})`;
+getElement('loopVideoTriggerDelayLabel').innerText =
+  `Video delay (${controllerState.loopVideoTriggerDelay})`;
+getElement('loop').disabled = loopVideoSensorConfigured;
+getElement('loop').title = loopVideoSensorConfigured
+  ? 'Loop video sensor is configured; loop playback is disabled'
+  : 'Loop video';
+if (loopVideoSensorConfigured && savedState.loop) store.setState({ loop: false });
+setToggle('loop', controllerState.loop);
 sendInitialState();
 setOutputConnectionStatus(false, 'Output screen not connected');
 setHomeAssistantStatus(false, 'Home Assistant Disconnected');

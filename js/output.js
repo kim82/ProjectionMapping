@@ -17,7 +17,9 @@ let mapping = DEFAULT;
 let showTestPattern = false;
 let testPatternReady = false;
 let hasStarted = false;
-let isMutedByUser = false;
+let isLoopMutedByUser = false;
+let isTriggerMutedByUser = false;
+let loopVideoAutoplay = true;
 let masterVolume = 1;
 let isMirroredHorizontally = false;
 let videoRotationDegrees = 0;
@@ -25,12 +27,20 @@ let triggerState = 'idle';
 let triggerMix = 0;
 let fadeDuration = 0.6;
 let triggerDelaySec = 0;
+let loopVideoTriggerDelaySec = 0;
 let pendingTriggerTimeout = null;
+let pendingLoopVideoTriggerTimeout = null;
+let shouldResumeLoopAfterTrigger = false;
 let previousFrameTime = performance.now();
 
 const loopVideo = new VideoSource();
 const triggerVideo = new VideoSource();
 triggerVideo.el.loop = false;
+
+loopVideo.el.addEventListener('ended', () => {
+  loopVideo.el.currentTime = 0;
+  shouldResumeLoopAfterTrigger = false;
+});
 
 function buildTestPattern() {
   const canvas = document.createElement('canvas');
@@ -102,8 +112,8 @@ renderer.onLost = () => {
 };
 
 function applyMute() {
-  loopVideo.el.muted = isMutedByUser;
-  triggerVideo.el.muted = isMutedByUser;
+  loopVideo.el.muted = isLoopMutedByUser;
+  triggerVideo.el.muted = isTriggerMutedByUser;
 }
 
 function cancelPendingTrigger() {
@@ -123,6 +133,8 @@ function trigger() {
   }
 
   showTestPattern = false;
+  shouldResumeLoopAfterTrigger = loopVideoAutoplay
+    || (!loopVideo.el.paused && !loopVideo.el.ended);
   triggerVideo.el.currentTime = 0;
   pendingTriggerTimeout = setTimeout(() => {
     pendingTriggerTimeout = null;
@@ -135,10 +147,29 @@ function trigger() {
   }
 }
 
+function loopVideoTrigger() {
+  if (!loopVideo.loaded) return;
+  if (!loopVideo.el.paused && !loopVideo.el.ended) return;
+
+  if (pendingLoopVideoTriggerTimeout !== null) {
+    clearTimeout(pendingLoopVideoTriggerTimeout);
+  }
+  showTestPattern = false;
+  loopVideo.el.loop = false;
+  loopVideo.el.pause();
+  loopVideo.el.currentTime = 0;
+  pendingLoopVideoTriggerTimeout = setTimeout(() => {
+    pendingLoopVideoTriggerTimeout = null;
+    shouldResumeLoopAfterTrigger = true;
+    loopVideo.start();
+  }, Number(loopVideoTriggerDelaySec * 1000) || 0);
+}
+
 function fadeOut() {
   if (triggerState === 'fadeout' || triggerState === 'idle') return;
   triggerState = 'fadeout';
-  loopVideo.start();
+  if (shouldResumeLoopAfterTrigger) loopVideo.start();
+  shouldResumeLoopAfterTrigger = false;
 }
 
 function skipTrigger() {
@@ -190,22 +221,39 @@ function loadMedia(mediaSlot, file) {
 
   const videoSource = mediaSlot === 'loop' ? loopVideo : triggerVideo;
   videoSource.load(file);
-  if (mediaSlot === 'loop' && hasStarted) loopVideo.start();
+  if (mediaSlot === 'loop' && hasStarted && loopVideoAutoplay) loopVideo.start();
 }
 
 const commands = {
   mapping: message => mapping = message.mapping,
   test: message => showTestPattern = message.on,
-  loop: message => loopVideo.el.loop = message.on,
+  loop: message => loopVideo.el.loop = loopVideoAutoplay && message.on,
+  loopAutoplay: message => {
+    loopVideoAutoplay = message.on;
+    if (!loopVideoAutoplay) {
+      loopVideo.el.loop = false;
+      loopVideo.el.pause();
+    }
+  },
   volume: message => masterVolume = message.v,
   mute: message => {
-    isMutedByUser = message.on;
+    isLoopMutedByUser = message.on;
+    applyMute();
+  },
+  loopMute: message => {
+    isLoopMutedByUser = message.on;
+    applyMute();
+  },
+  triggerMute: message => {
+    isTriggerMutedByUser = message.on;
     applyMute();
   },
   mirror: message => isMirroredHorizontally = message.on,
   rotate: message => videoRotationDegrees = message.degrees,
   fade: message => fadeDuration = message.s,
   triggerDelay: message => triggerDelaySec = message.s,
+  loopVideoTriggerDelay: message => loopVideoTriggerDelaySec = message.s,
+  loopVideoTrigger,
   play: () => loopVideo.start(),
   pause: () => loopVideo.el.pause(),
   restart: () => loopVideo.restart(),
@@ -224,13 +272,16 @@ function handleMessage(message) {
     const initialState = message.state;
     if (initialState.mapping) mapping = initialState.mapping;
     showTestPattern = !!initialState.test;
-    loopVideo.el.loop = !!initialState.loop;
+    loopVideoAutoplay = initialState.loopVideoAutoplay !== false;
+    loopVideo.el.loop = loopVideoAutoplay && !!initialState.loop;
     masterVolume = initialState.volume;
-    isMutedByUser = !!initialState.muted;
+    isLoopMutedByUser = !!initialState.loopMuted;
+    isTriggerMutedByUser = !!initialState.triggerMuted;
     isMirroredHorizontally = !!initialState.mirrorHorizontal;
     videoRotationDegrees = initialState.videoRotationDegrees ?? 0;
     fadeDuration = initialState.fadeTime;
     triggerDelaySec = initialState.triggerDelay ?? 0;
+    loopVideoTriggerDelaySec = initialState.loopVideoTriggerDelay ?? 0;
     applyMute();
 
     for (const [mediaSlot, file] of Object.entries(message.media || {})) {
@@ -253,7 +304,8 @@ setInterval(() => channel.send({
   paused: loopVideo.el.paused,
   state: triggerState,
   test: showTestPattern,
-  muted: isMutedByUser,
+  loopMuted: isLoopMutedByUser,
+  triggerMuted: isTriggerMutedByUser,
   started: hasStarted,
   screen: { w: innerWidth, h: innerHeight }
 }), 250);
@@ -263,7 +315,7 @@ getElement('start').onclick = () => {
   getElement('start').hidden = true;
   document.body.classList.add('run');
   document.documentElement.requestFullscreen?.().catch(() => {});
-  loopVideo.start();
+  if (loopVideoAutoplay) loopVideo.start();
 };
 
 window.addEventListener('keydown', event => {

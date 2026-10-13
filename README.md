@@ -80,7 +80,8 @@ The controller is the main UI for mapping and playback:
 - Play / Restart
 - Loop toggle
 - Seek bar and time display
-- Mute and volume slider
+- Separate mute controls for the loop and trigger videos, and a shared volume slider
+- Independent delays for the trigger video and sensor-triggered loop video
 - Save Mapping / Load Mapping
 - Open Output Screen
 - Home Assistant settings
@@ -120,15 +121,16 @@ window.dispatchEvent(new Event('projectionmapper:toggle'));
 
 ## Home Assistant integration
 
-The app can optionally connect to Home Assistant using a websocket connection.
+The app can optionally connect to Home Assistant using a websocket connection. The motion entity triggers the trigger video. An optional loop video entity can also trigger the loop video once; while it is configured, the loop video does not autoplay and the loop toggle is disabled. Further loop-video sensor events are ignored while that video is playing. Once playback ends, it returns to and holds on its first frame.
 
 Required settings:
 
 - WebSocket URL, for example `ws://homeassistant.local:8123/api/websocket` or `wss://homeassistant.local:8123/api/websocket`
 - Long-lived access token
 - Motion entity such as `binary_sensor.front_motion`
+- Optional loop video entity such as `binary_sensor.loop_video_trigger`
 
-The app now prefers the secure websocket scheme when the page is running over HTTPS, but the URL can still be set manually to match your Home Assistant deployment. When the configured entity changes from `off` to `on`, the trigger fires unless one is already in progress. The settings are saved in browser localStorage.
+The app now prefers the secure websocket scheme when the page is running over HTTPS, but the URL can still be set manually to match your Home Assistant deployment. When the motion entity changes from `off` to `on`, the trigger video fires unless one is already in progress. When the optional loop video entity changes from `off` to `on`, the loop video plays once after its separately configured delay. The settings are saved in browser localStorage.
 
 ## Storage and saved mappings
 
@@ -138,6 +140,7 @@ Mappings are saved in browser localStorage under the app namespace. The code sto
 - selected mapping name
 - loop state
 - volume
+- independent mute states and trigger delays
 - Home Assistant settings
 
 This means the controller remembers mapping, volume, and loop state between reloads on the same browser profile.

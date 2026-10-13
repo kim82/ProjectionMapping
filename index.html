@@ -12,11 +12,15 @@
 </head>
 <body>
     <header id="top">
-        <h1>Projection Mapper</h1><span id="status"></span>
-        <span id="out-status" class="ha-indicator" title="Click to open output screen">Connecting...</span>
-        <span id="ha-status" class="ha-indicator" aria-live="polite" title="Click to open Home Assistant settings">
-            <span id="ha-led" class="ha-dot"></span>
-            <span id="ha-status-text">Home Assistant Disconnected</span>
+        <h1>Projection Mapper</h1>
+        <span id="load" class="widget" title="">Load video...</span><input id="file" type="file" accept="video/*" hidden>
+        <span id="loadtrig" class="widget" title="">Load trigger video...</span><input id="file2" type="file" accept="video/*" hidden>
+        <span class="widgetgroup right">
+            <span id="out-status" class="widget" title="Click to open output screen">Connecting...</span>
+            <span id="ha-status" class="widget" aria-live="polite" title="Click to open Home Assistant settings">
+                <span id="ha-led" class="ha-dot"></span>
+                <span id="ha-status-text">Home Assistant Disconnected</span>
+            </span>
         </span>
     </header>
     <main id="stage">
@@ -25,8 +29,6 @@
     </main>
     <section id="panel">
         <div class="row">
-            <button id="load">Load Loop...</button><input id="file" type="file" accept="video/*" hidden>
-            <button id="loadtrig">Load Trigger...</button><input id="file2" type="file" accept="video/*" hidden>
             <button id="test" class="toggle">Test Pattern</button>
             <button id="mirror" class="toggle" aria-pressed="false">⮀ Mirror Video</button>
             <button id="rotate" type="button" aria-label="Rotate video 90 degrees">⭯ Rotate Video</button>
@@ -35,17 +37,33 @@
         <div class="row">
         </div>
         <div class="row">
-            <button id="trigger" title="Play the trigger video (T)">Trigger (T)</button>
             <button id="play" title="Play">▶</button>
             <button id="restart" title="Restart video">⏮</button>
             <button id="loop" class="toggle" title="Loop video">⟳</button>
             <input id="seek" type="range" min="0" max="1000" value="0"><span id="time">0:00 / 0:00</span>
         </div>
         <div class="row">
-            <button id="mute">🔈</button>
+            <div class="col">
+            <span class="groupLabel">Volume</span>
             <input id="vol" type="range" min="0" max="1" step="0.01" value="1">
-            <label for="triggerDelay" id="triggerDelayLabel">Trigger Delay (0)</label>
-            <input id="triggerDelay" type="range" min="0" max="60" step="1" value="0">
+            </div>
+            <div class="col">
+                <span class="groupLabel">Main video</span>
+                <div class="row">
+                    <button id="mute" title="Mute loop video" aria-label="Mute loop video">🔈</button>
+                    <label for="loopVideoTriggerDelay" id="loopVideoTriggerDelayLabel">Video delay (0)</label>
+                    <input id="loopVideoTriggerDelay" type="range" min="0" max="60" step="1" value="0">
+                </div>
+            </div>
+            <div class="col">
+                <span class="groupLabel">Trigger video</span>
+                <div class="row">
+                    <button id="trigger" title="Play the trigger video (T)">Trigger (T)</button>
+                    <button id="triggerMute" title="Mute trigger video" aria-label="Mute trigger video">🔈</button>
+                    <label for="triggerDelay" id="triggerDelayLabel">Video delay (0)</label>
+                    <input id="triggerDelay" type="range" min="0" max="60" step="1" value="0">
+                </div>
+            </div>
         </div>
     </section>
     <dialog id="ha-dialog">
@@ -63,12 +81,15 @@
             <label>Motion entity
                 <input id="ha-motion-entity" type="text" placeholder="binary_sensor.front_motion" required>
             </label>
+            <label>Loop video entity (optional)
+                <input id="ha-loop-video-entity" type="text" placeholder="binary_sensor.loop_video_trigger">
+            </label>
             <div class="dialog-actions">
                 <button type="button" id="ha-dialog-cancel">Cancel</button>
                 <button type="submit" class="primary">Save</button>
             </div>
         </form>
     </dialog>
-        <script type="module" src="js/controller.js?v=20261005_1"></script>
+        <script type="module" src="js/controller.js?v=20261013_1"></script>
 </body>
 </html>
