@@ -14,8 +14,12 @@ precision highp float;
 varying vec3 vUV;
 uniform sampler2D uTex;
 uniform float uAlpha;
+uniform float uKeyBlack;
 void main() {
-  gl_FragColor = vec4(texture2D(uTex, vUV.xy / vUV.z).rgb, uAlpha);
+  vec3 color = texture2D(uTex, vUV.xy / vUV.z).rgb;
+  float blackKey = 1.0 - smoothstep(0.02, 0.14, max(max(color.r, color.g), color.b));
+  float alpha = uAlpha * (1.0 - uKeyBlack * blackKey);
+  gl_FragColor = vec4(color, alpha);
 }`;
 
 export class Renderer {
@@ -66,6 +70,7 @@ export class Renderer {
 
     this.buffer = gl.createBuffer();
     this.alphaUniform = gl.getUniformLocation(program, 'uAlpha');
+    this.blackKeyUniform = gl.getUniformLocation(program, 'uKeyBlack');
     this.positionAttribute = gl.getAttribLocation(program, 'aPos');
     this.uvAttribute = gl.getAttribLocation(program, 'aUV');
     this.textures = {
@@ -171,6 +176,7 @@ export class Renderer {
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
       gl.bindTexture(gl.TEXTURE_2D, this.textures[layer.tex]);
       gl.uniform1f(this.alphaUniform, layer.a);
+      gl.uniform1f(this.blackKeyUniform, layer.keyBlack ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
   }

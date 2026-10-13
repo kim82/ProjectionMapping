@@ -28,6 +28,7 @@ const controllerState = {
   volume: savedState.volume ?? 1,
   loopMuted: !!savedState.loopMuted,
   triggerMuted: !!savedState.triggerMuted,
+  triggerTransparency: savedState.triggerTransparency !== false,
   fadeTime: 0.6,
   triggerDelay: savedState.triggerDelay ?? 0,
   loopVideoTriggerDelay: savedState.loopVideoTriggerDelay ?? 0,
@@ -43,6 +44,7 @@ const commandStateFields = {
   volume: ['volume', 'v'],
   loopMute: ['loopMuted', 'on'],
   triggerMute: ['triggerMuted', 'on'],
+  triggerTransparency: ['triggerTransparency', 'on'],
   fade: ['fadeTime', 's'],
   triggerDelay: ['triggerDelay', 's'],
   loopVideoTriggerDelay: ['loopVideoTriggerDelay', 's'],
@@ -374,6 +376,18 @@ getElement('ha-dialog-cancel').addEventListener('click', closeHomeAssistantSetti
 getElement('ha-form').addEventListener('submit', saveHomeAssistantSettings);
 
 function uploadMedia(slot, file) {
+  if (slot === 'loop') {
+    controllerState.loopMuted = false;
+    store.setState({ loopMuted: false });
+    sendCommand('loopMute', { on: false });
+    getElement('mute').innerText = '🔈';
+  } else if (slot === 'trigger') {
+    controllerState.triggerMuted = false;
+    store.setState({ triggerMuted: false });
+    sendCommand('triggerMute', { on: false });
+    getElement('triggerMute').innerText = '🔈';
+  }
+
   mediaFiles[slot] = file;
   mediaNames[slot] = { name: file.name };
   showMediaNames();
@@ -443,6 +457,14 @@ getElement('triggerMute').onclick = () => {
   store.setState({ triggerMuted: nextMuted });
   sendCommand('triggerMute', { on: nextMuted });
   getElement('triggerMute').innerText = nextMuted ? '🔇' : '🔈';
+};
+getElement('triggerTransparency').onclick = () => {
+  const enabled = !controllerState.triggerTransparency;
+  controllerState.triggerTransparency = enabled;
+  store.setState({ triggerTransparency: enabled });
+  setToggle('triggerTransparency', enabled);
+  getElement('triggerTransparency').setAttribute('aria-pressed', String(enabled));
+  sendCommand('triggerTransparency', { on: enabled });
 };
 getElement('vol').oninput = event => {
   const volume = +event.target.value;
@@ -528,6 +550,11 @@ getElement('rotate').setAttribute(
 );
 getElement('vol').value = controllerState.volume;
 getElement('vol').title = parseInt(controllerState.volume  * 100);
+setToggle('triggerTransparency', controllerState.triggerTransparency);
+getElement('triggerTransparency').setAttribute(
+  'aria-pressed',
+  String(controllerState.triggerTransparency)
+);
 getElement('triggerDelayLabel').innerText =
   `Video delay (${controllerState.triggerDelay})`;
 getElement('loopVideoTriggerDelayLabel').innerText =

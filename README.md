@@ -80,7 +80,7 @@ The controller is the main UI for mapping and playback:
 - Play / Restart
 - Loop toggle
 - Seek bar and time display
-- Separate mute controls for the loop and trigger videos, and a shared volume slider
+- Separate mute controls for the loop and trigger videos, and a shared volume slider. Loading a video enables its sound by default.
 - Independent delays for the trigger video and sensor-triggered loop video
 - Save Mapping / Load Mapping
 - Open Output Screen
@@ -92,13 +92,13 @@ The overlay designer draws the quadrilateral and optional grid in the aspect rat
 
 The trigger flow implemented in the code is:
 
-1. Loop video fades out
+1. Main video pauses on its current frame
 2. Trigger video fades in
-3. Loop video pauses while trigger plays
+3. The trigger video is composited over the paused main video; an optional controller toggle keys its black background to transparent
 4. Trigger restarts from the beginning each time it is triggered
-5. Trigger ends or is skipped, then the loop resumes and fades back in
+5. Trigger ends or is skipped, then the main video resumes
 
-Default fade time is `0` seconds and can be changed from the controller API.
+The fade time can be changed from the controller API.
 
 ## Custom API hooks
 

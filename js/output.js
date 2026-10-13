@@ -1,4 +1,4 @@
-import { Renderer } from './webgl.js?v=20261005';
+import { Renderer } from './webgl.js?v=20261013_2';
 import { VideoSource } from './video.js?v=20261005';
 import { DEFAULT } from './mapping.js?v=20261005';
 import { connect } from './net.js?v=20261005';
@@ -19,6 +19,7 @@ let testPatternReady = false;
 let hasStarted = false;
 let isLoopMutedByUser = false;
 let isTriggerMutedByUser = false;
+let triggerTransparency = true;
 let loopVideoAutoplay = true;
 let masterVolume = 1;
 let isMirroredHorizontally = false;
@@ -133,12 +134,12 @@ function trigger() {
   }
 
   showTestPattern = false;
-  shouldResumeLoopAfterTrigger = loopVideoAutoplay
-    || (!loopVideo.el.paused && !loopVideo.el.ended);
+  shouldResumeLoopAfterTrigger = !loopVideo.el.paused && !loopVideo.el.ended;
   triggerVideo.el.currentTime = 0;
   pendingTriggerTimeout = setTimeout(() => {
     pendingTriggerTimeout = null;
     console.log('Triggering video with delay of', triggerDelaySec, 'seconds');
+    if (shouldResumeLoopAfterTrigger) loopVideo.el.pause();
     triggerVideo.start();
   }, Number(triggerDelaySec * 1000) || 0);
 
@@ -168,8 +169,6 @@ function loopVideoTrigger() {
 function fadeOut() {
   if (triggerState === 'fadeout' || triggerState === 'idle') return;
   triggerState = 'fadeout';
-  if (shouldResumeLoopAfterTrigger) loopVideo.start();
-  shouldResumeLoopAfterTrigger = false;
 }
 
 function skipTrigger() {
@@ -201,19 +200,27 @@ function updatePlayback() {
     triggerMix = Math.min(1, triggerMix + deltaSeconds / fadeDurationSeconds);
     if (triggerMix >= 1) {
       triggerState = 'playing';
-      loopVideo.el.pause();
+      if (!triggerTransparency)
+        loopVideo.el.pause();
     }
   } else if (triggerState === 'fadeout') {
     triggerMix = Math.max(0, triggerMix - deltaSeconds / fadeDurationSeconds);
     if (triggerMix <= 0) {
       triggerState = 'idle';
       triggerVideo.el.pause();
+      if (shouldResumeLoopAfterTrigger) loopVideo.start();
+      shouldResumeLoopAfterTrigger = false;
     }
   }
-
-  const isIdle = triggerState === 'idle';
-  loopVideo.el.volume = isIdle ? masterVolume : masterVolume * (1 - triggerMix);
-  triggerVideo.el.volume = isIdle ? 0 : masterVolume * triggerMix;
+  if (!triggerTransparency) {
+    const isIdle = triggerState === 'idle';
+    loopVideo.el.volume = isIdle ? masterVolume : masterVolume * (1 - triggerMix);
+    triggerVideo.el.volume = isIdle ? 0 : masterVolume * triggerMix;
+  }
+  else {
+    loopVideo.el.volume = masterVolume;
+    triggerVideo.el.volume = masterVolume;
+  }
 }
 
 function loadMedia(mediaSlot, file) {
@@ -248,6 +255,7 @@ const commands = {
     isTriggerMutedByUser = message.on;
     applyMute();
   },
+  triggerTransparency: message => triggerTransparency = message.on,
   mirror: message => isMirroredHorizontally = message.on,
   rotate: message => videoRotationDegrees = message.degrees,
   fade: message => fadeDuration = message.s,
@@ -277,6 +285,7 @@ function handleMessage(message) {
     masterVolume = initialState.volume;
     isLoopMutedByUser = !!initialState.loopMuted;
     isTriggerMutedByUser = !!initialState.triggerMuted;
+    triggerTransparency = initialState.triggerTransparency !== false;
     isMirroredHorizontally = !!initialState.mirrorHorizontal;
     videoRotationDegrees = initialState.videoRotationDegrees ?? 0;
     fadeDuration = initialState.fadeTime;
@@ -346,7 +355,13 @@ function drawFrame() {
     layers.push({ tex: 'test', a: 1 });
   } else {
     if (loopVideo.ready) layers.push({ tex: 'video', a: 1 });
-    if (triggerState !== 'idle') layers.push({ tex: 'trigger', a: triggerMix });
+    if (triggerState !== 'idle') {
+      layers.push({
+        tex: 'trigger',
+        a: triggerMix,
+        keyBlack: triggerTransparency
+      });
+    }
   }
 
   renderer.draw(mapping, layers, isMirroredHorizontally, videoRotationDegrees);
