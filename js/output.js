@@ -1,4 +1,4 @@
-import { Renderer } from './webgl.js?v=20261013_2';
+import { Renderer } from './webgl.js?v=20261016';
 import { VideoSource } from './video.js?v=20261005';
 import { DEFAULT } from './mapping.js?v=20261005';
 import { connect } from './net.js?v=20261005';

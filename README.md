@@ -63,7 +63,7 @@ python3 -m http.server 8080 --bind 127.0.0.1
 Then open:
 
 1. `http://localhost:8080/` on the main controller screen
-2. Click `Open Output Screen` in the controller UI
+2. Click the output connection status in the top-right corner of the controller to open the output screen
 3. Drag that output window to the projector and click it once to enable audio and fullscreen
 
 > Opening the files directly with `file://` is not supported because browser module loading is blocked.
@@ -72,21 +72,25 @@ Then open:
 
 The controller is the main UI for mapping and playback:
 
-- Load Loop Video
-- Load Trigger Video
+- Load video...: loads the main (loop) video; shows `Loop: <filename>` after loading.
+- Load trigger video...: loads the trigger video; shows `Trigger: <filename>` after loading.
 - Trigger (`T`)
-- Test Pattern
-- Reset Mapping
+- Test Pattern: follows the same video rotation and mirroring as the loop and trigger videos.
+- Mirror Video: mirrors the loop video, trigger video, and test pattern horizontally.
+- Rotate Video (0 degrees): rotates the loop video, trigger video, and test pattern in 90-degree steps. The button shows the current rotation.
+- Rotate Mapping (0 degrees): rotates the controller grid clockwise in 90-degree steps to match a physically rotated output screen. The button shows the current rotation. Dragging corners and arrow-key adjustments follow the rotated view. The selected view rotation is saved between reloads; it does not change the output mapping or video rotation.
+- Reset All: restores the default corners, resets mapping-view and video rotation to 0 degrees, and disables mirroring. These resets are saved and applied to the connected output; playback and audio settings are unchanged.
 - Play / Restart
 - Loop toggle
 - Seek bar and time display
 - Separate mute controls for the loop and trigger videos, and a shared volume slider. Loading a video enables its sound by default.
-- Independent delays for the trigger video and sensor-triggered loop video
-- Save Mapping / Load Mapping
-- Open Output Screen
+- Transparent Background: makes black areas of the trigger video transparent, revealing the main video underneath.
+- Video delay (0): independent delay sliders under Main video and Trigger video, displaying the selected delay in seconds.
+- Mapping changes are saved automatically.
+- Output connection status (top right): click to open the output screen.
 - Home Assistant settings
 
-The overlay designer draws the quadrilateral and optional grid in the aspect ratio of the projector output, but it does not show a live media preview.
+The overlay designer draws the quadrilateral and optional grid in the aspect ratio of the projector output (swapped for 90- or 270-degree mapping views), but it does not show a live media preview. Use Rotate Video separately if the media itself also needs rotating.
 
 ## Trigger behavior
 
@@ -94,7 +98,7 @@ The trigger flow implemented in the code is:
 
 1. Main video pauses on its current frame
 2. Trigger video fades in
-3. The trigger video is composited over the paused main video; an optional controller toggle keys its black background to transparent
+3. The trigger video is composited over the paused main video; the Transparent Background toggle makes its black areas transparent
 4. Trigger restarts from the beginning each time it is triggered
 5. Trigger ends or is skipped, then the main video resumes
 
@@ -137,7 +141,9 @@ The app now prefers the secure websocket scheme when the page is running over HT
 Mappings are saved in browser localStorage under the app namespace. The code stores:
 
 - current mapping
-- selected mapping name
+- controller mapping-view rotation
+- video rotation and mirroring
+- Transparent Background toggle
 - loop state
 - volume
 - independent mute states and trigger delays

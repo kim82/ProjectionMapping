@@ -1,11 +1,20 @@
 import { KEYS } from './mapping.js?v=20261005';
 
+function rotatePosition([x, y], degrees) {
+  const rotation = ((degrees % 360) + 360) % 360;
+  if (rotation === 90) return [1 - y, x];
+  if (rotation === 180) return [1 - x, 1 - y];
+  if (rotation === 270) return [y, 1 - x];
+  return [x, y];
+}
+
 // Draws the calibration overlay and lets users drag its normalized corner handles.
 export class Calibration {
   constructor(canvas, getMapping, onChange) {
     this.canvas = canvas;
     this.getMapping = getMapping;
     this.onChange = onChange;
+    this.rotationDegrees = 0;
     this.showGrid = true;
     this.activeCorner = null;
     this.hoveredCorner = null;
@@ -28,8 +37,7 @@ export class Calibration {
     var stepSize = 0.001;
     
     if (this.hoveredCorner != null) {
-      var xMapping = this.getMapping()[this.hoveredCorner][0];
-      var yMapping = this.getMapping()[this.hoveredCorner][1];
+      let [xMapping, yMapping] = this.toView(this.getMapping()[this.hoveredCorner]);
       switch (event.key) {
         case 'ArrowUp':
           yMapping -= stepSize;
@@ -43,14 +51,24 @@ export class Calibration {
         case 'ArrowRight':
           xMapping += stepSize;
           break;
+        default:
+          return;
       }
-      this.getMapping()[this.hoveredCorner] = [
+      this.getMapping()[this.hoveredCorner] = this.fromView([
         Math.min(1, Math.max(0, xMapping)),
         Math.min(1, Math.max(0, yMapping))
-      ];
+      ]);
       this.onChange();
       event.preventDefault();
     }
+  }
+
+  toView(position) {
+    return rotatePosition(position, this.rotationDegrees);
+  }
+
+  fromView(position) {
+    return rotatePosition(position, -this.rotationDegrees);
   }
 
   getNormalizedPosition(event) {
@@ -68,9 +86,10 @@ export class Calibration {
     let closestDistance = this.hitRadius;
 
     for (const corner of KEYS) {
+      const [x, y] = this.toView(mapping[corner]);
       const distance = Math.hypot(
-        mapping[corner][0] * bounds.width - (event.clientX - bounds.left),
-        mapping[corner][1] * bounds.height - (event.clientY - bounds.top)
+        x * bounds.width - (event.clientX - bounds.left),
+        y * bounds.height - (event.clientY - bounds.top)
       );
 
       if (distance < closestDistance) {
@@ -95,10 +114,10 @@ export class Calibration {
   onPointerMove(event) {
     if (this.activeCorner) {
       const [x, y] = this.getNormalizedPosition(event);
-      this.getMapping()[this.activeCorner] = [
+      this.getMapping()[this.activeCorner] = this.fromView([
         Math.min(1, Math.max(0, x)),
         Math.min(1, Math.max(0, y))
-      ];
+      ]);
       this.onChange();
       return;
     }
@@ -128,10 +147,10 @@ export class Calibration {
     context.clearRect(0, 0, width, height);
 
     const mapping = this.getMapping();
-    const points = KEYS.map(corner => [
-      mapping[corner][0] * width,
-      mapping[corner][1] * height
-    ]);
+    const points = KEYS.map(corner => {
+      const [x, y] = this.toView(mapping[corner]);
+      return [x * width, y * height];
+    });
 
     context.strokeStyle = '#ff9f1c';
     context.lineWidth = 1.5;

@@ -1,6 +1,6 @@
 import { connect } from './net.js?v=20261005';
 import { DEFAULT, clone } from './mapping.js?v=20261005';
-import { Calibration } from './controls.js?v=20261005';
+import { Calibration } from './controls.js?v=20261016';
 import * as store from './storage.js?v=20261005';
 
 const getElement = id => document.getElementById(id);
@@ -21,6 +21,7 @@ let mediaNames = {};
 let isSeeking = false;
 let outputScreenSize = { w: 16, h: 9 };
 let mappingUpdatePending = false;
+let mappingRotationDegrees = normalizeRotation(savedState.mappingRotationDegrees);
 
 const controllerState = {
   loop: !!savedState.loop && !loopVideoSensorConfigured,
@@ -79,6 +80,7 @@ const calibration = new Calibration(
     sendMapping();
   }
 );
+calibration.rotationDegrees = mappingRotationDegrees;
 
 function setOutputConnectionStatus(isConnected, message) {
   const statusElement = getElement('out-status');
@@ -102,7 +104,9 @@ function fitCalibrationOverlay() {
   const stage = getElement('stage');
   const stageWidth = stage.clientWidth;
   const stageHeight = stage.clientHeight;
-  const outputAspectRatio = outputScreenSize.w / outputScreenSize.h;
+  const outputAspectRatio = mappingRotationDegrees % 180 === 90
+    ? outputScreenSize.h / outputScreenSize.w
+    : outputScreenSize.w / outputScreenSize.h;
   let overlayWidth = stageWidth;
   let overlayHeight = stageWidth / outputAspectRatio;
 
@@ -417,11 +421,35 @@ getElement('mirror').onclick = () => {
 getElement('rotate').onclick = () => {
   controllerState.videoRotationDegrees = (controllerState.videoRotationDegrees + 90) % 360;
   store.setState({ videoRotationDegrees: controllerState.videoRotationDegrees });
-  getElement('rotate').setAttribute(
+  updateVideoRotationButton();
+  sendCommand('rotate', { degrees: controllerState.videoRotationDegrees });
+};
+
+function updateVideoRotationButton() {
+  const button = getElement('rotate');
+  button.textContent = `\u2b6f Rotate Video (${controllerState.videoRotationDegrees}\u00b0)`;
+  button.setAttribute(
     'aria-label',
     `Rotate video 90 degrees; current rotation ${controllerState.videoRotationDegrees} degrees`
   );
-  sendCommand('rotate', { degrees: controllerState.videoRotationDegrees });
+}
+
+function updateMappingRotationButton() {
+  const button = getElement('rotate-mapping');
+  button.textContent = `⭯ Rotate Mapping (${mappingRotationDegrees}\u00b0)`;
+  button.setAttribute(
+    'aria-label',
+    `Rotate mapping view 90 degrees clockwise; current rotation ${mappingRotationDegrees} degrees`
+  );
+}
+
+getElement('rotate-mapping').onclick = () => {
+  mappingRotationDegrees = (mappingRotationDegrees + 90) % 360;
+  store.setState({ mappingRotationDegrees });
+  calibration.rotationDegrees = mappingRotationDegrees;
+  calibration.hoveredCorner = null;
+  updateMappingRotationButton();
+  fitCalibrationOverlay();
 };
 // getElement('grid').onclick = () => {
 //   calibration.showGrid = !calibration.showGrid;
@@ -430,8 +458,25 @@ getElement('rotate').onclick = () => {
 // };
 getElement('reset').onclick = () => {
   mapping = clone(DEFAULT);
-  store.setState({ mapping });
-  calibration.draw();
+  mappingRotationDegrees = 0;
+  controllerState.videoRotationDegrees = 0;
+  controllerState.mirrorHorizontal = false;
+  store.setState({
+    mapping,
+    mappingRotationDegrees,
+    videoRotationDegrees: 0,
+    mirrorHorizontal: false
+  });
+  calibration.rotationDegrees = 0;
+  calibration.activeCorner = null;
+  calibration.hoveredCorner = null;
+  setToggle('mirror', false);
+  getElement('mirror').setAttribute('aria-pressed', 'false');
+  updateVideoRotationButton();
+  updateMappingRotationButton();
+  fitCalibrationOverlay();
+  sendCommand('rotate', { degrees: 0 });
+  sendCommand('mirror', { on: false });
   sendCommand('mapping', { mapping });
 };
 getElement('play').onclick = () => {
@@ -540,14 +585,12 @@ window.addEventListener('keydown', event => {
 });
 
 window.addEventListener('resize', fitCalibrationOverlay);
+updateMappingRotationButton();
 setToggle('loop', controllerState.loop);
 // setToggle('grid', calibration.showGrid);
 setToggle('mirror', controllerState.mirrorHorizontal);
 getElement('mirror').setAttribute('aria-pressed', String(controllerState.mirrorHorizontal));
-getElement('rotate').setAttribute(
-  'aria-label',
-  `Rotate video 90 degrees; current rotation ${controllerState.videoRotationDegrees} degrees`
-);
+updateVideoRotationButton();
 getElement('vol').value = controllerState.volume;
 getElement('vol').title = parseInt(controllerState.volume  * 100);
 setToggle('triggerTransparency', controllerState.triggerTransparency);

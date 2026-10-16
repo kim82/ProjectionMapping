@@ -140,6 +140,7 @@ export class Renderer {
     const points = toArray(mapping);
     const correctionFactors = quadQ(points);
     const textureCoordinates = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const rotation = ((Math.round(rotationDegrees / 90) % 4 + 4) % 4);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.enableVertexAttribArray(this.positionAttribute);
     gl.vertexAttribPointer(this.positionAttribute, 2, gl.FLOAT, false, 20, 0);
@@ -147,9 +148,6 @@ export class Renderer {
     gl.vertexAttribPointer(this.uvAttribute, 3, gl.FLOAT, false, 20, 8);
 
     for (const layer of layers) {
-      const rotation = layer.tex === 'test'
-        ? 0
-        : ((Math.round(rotationDegrees / 90) % 4 + 4) % 4);
       const makeVertex = index => {
         const [x, y] = points[index];
         const [u, v] = textureCoordinates[index];
