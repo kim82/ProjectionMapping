@@ -1,119 +1,95 @@
 # Projection Mapper
 
-A browser-based projection-mapping tool for displaying a warped video on a physical surface using a projector. The app keeps a controller page and a fullscreen output page in sync and uses a WebGL homography transform to map the media onto a quadrilateral.
+A browser-based tool for **projection mapping videos onto physical surfaces** using a projector.
 
-The project is entirely client-side: HTML, CSS, and JavaScript only. There is no backend or build step required for the app itself.
+Adjust the projection by dragging four corners, play looping and trigger videos, and optionally connect to Home Assistant for motion-triggered playback.
 
-### Disclosure
-This project was built using AI (GitHub copilot)
+Built with HTML, CSS, JavaScript, and WebGL. No build step or backend required.
 
-## What it does
+**AI disclosure:** This project was developed with the help of GitHub Copilot.
 
-- Warps the loop video and trigger video onto a four-corner mapped surface using WebGL
-- Lets you drag the four corners in the controller UI to match your projection surface
-- Shows a live test pattern for alignment when needed
-- Crossfades between a looping background video and a trigger video
-- Saves settings in browser localStorage
-- Optional integration with Home Assistant motion events
+## Features
 
-## How the app is split
+- **Projection mapping** — adjust four corners to fit your surface.
+- **Video playback** — play a looping video and trigger videos on demand.
+- **Video effects** — rotate, mirror, and adjust video delays.
+- **Test pattern** — align the projection with your physical surface.
+- **Transparent background** — show the main video through black areas of the trigger video.
+- **Home Assistant** — optionally trigger videos using motion sensors.
+- **Automatic saving** — settings and mapping are saved in your browser.
 
-- Controller page: `index.html` and `js/controller.js`
-  - Drag corners and edit mapping
-  - Load loop/trigger media
-  - Control playback, volume, and trigger state
-  - Initializes the optional Home Assistant integration
-- Home Assistant integration: `js/homeassistant.js`
-  - Manages the settings dialog and Home Assistant WebSocket connection
-  - Handles motion and optional loop-video sensor events
-  - Sends sensor-triggered playback actions to the controller
-- Output page: `output.html` and `js/output.js`
-  - Fullscreen projector display
-  - Receives media and commands from the controller
-  - Renders the warped video in a fullscreen canvas
+## Quick Start
 
-## Project structure
+The app must run through a local web server. Opening `index.html` directly will not work.
 
-```text
-.
-├── index.html           Controller UI
-├── output.html          Fullscreen output window
-├── style.css            App styling
-├── js/
-│   ├── controller.js    Controller logic and UI state
-│   ├── homeassistant.js Home Assistant settings, connection, and sensor events
-│   ├── output.js        Output page render loop and commands
-│   ├── net.js           BroadcastChannel connection layer
-│   ├── webgl.js         WebGL renderer and shader-based warp
-│   ├── mapping.js       Default calibration data and corner helpers
-│   ├── controls.js      Corner designer and drag logic
-│   ├── video.js         Video element wrapper around playback state
-│   └── storage.js       LocalStorage persistence helpers
-├── package.json
-├── README.md
-└── .git/
-```
+1. Open a terminal in the project folder.
+2. Start a local web server:
 
-## Quick start
+   ```bash
+   python3 -m http.server 8080
+   ```
 
-This app must be served over HTTP because it uses ES modules. The repo is a static site, so any local web server works.
+3. Open [http://localhost:8080](http://localhost:8080).
+4. Click the output connection indicator in the top-right corner to open the projector output.
+5. Move the output window to your projector, click inside it, and enable fullscreen.
 
-Example using Python:
+**Recommended:** Use Chrome or Edge for the best compatibility.
 
-```bash
-cd /path/to/ProjectionMapping
-python3 -m http.server 8080 --bind 127.0.0.1
-```
+## How to Use
 
-Then open:
+### Controller
 
-1. `http://localhost:8080/` on the main controller screen
-2. Click the output connection status in the top-right corner of the controller to open the output screen
-3. Drag that output window to the projector and click it once to enable audio and fullscreen
+Use the controller window to configure and control your projection.
 
-> Opening the files directly with `file://` is not supported because browser module loading is blocked.
+| Control | Description |
+|---|---|
+| Load video | Select the main looping video |
+| Load trigger video | Select the video played when triggered |
+| Trigger (`T`) | Play the trigger video |
+| Test Pattern | Display a pattern for alignment |
+| Mirror Video | Flip videos horizontally |
+| Rotate Video | Rotate videos in 90° steps |
+| Rotate Mapping | Rotate the mapping grid to match the projector orientation |
+| Play / Restart | Play or restart the main video |
+| Loop | Enable or disable looping |
+| Transparent Background | Make black areas of the trigger video transparent |
+| Video Delay | Set a delay for the main or trigger video |
+| Reset All | Restore the default mapping and video orientation |
 
-## Controller controls
+You can also adjust playback position, volume, and mute settings. Mapping changes are saved automatically.
 
-The controller is the main UI for mapping and playback:
+### Trigger Playback
 
-- Load video...: loads the main (loop) video; shows `Loop: <filename>` after loading.
-- Load trigger video...: loads the trigger video; shows `Trigger: <filename>` after loading.
-- Trigger (`T`)
-- Test Pattern: follows the same video rotation and mirroring as the loop and trigger videos.
-- Mirror Video: mirrors the loop video, trigger video, and test pattern horizontally.
-- Rotate Video (0 degrees): rotates the loop video, trigger video, and test pattern in 90-degree steps. The button shows the current rotation.
-- Rotate Mapping (0 degrees): rotates the controller grid clockwise in 90-degree steps to match a physically rotated output screen. The button shows the current rotation. Dragging corners and arrow-key adjustments follow the rotated view. The selected view rotation is saved between reloads; it does not change the output mapping or video rotation.
-- Reset All: restores the default corners, resets mapping-view and video rotation to 0 degrees, and disables mirroring. These resets are saved and applied to the connected output; playback and audio settings are unchanged.
-- Play / Restart
-- Loop toggle
-- Seek bar and time display
-- Separate mute controls for the loop and trigger videos, and a shared volume slider. Loading a video enables its sound by default.
-- Transparent Background: makes black areas of the trigger video transparent, revealing the main video underneath.
-- Video delay (0): independent delay sliders under Main video and Trigger video, displaying the selected delay in seconds.
-- Mapping changes are saved automatically.
-- Output connection status (top right): click to open the output screen.
-- Home Assistant settings
+When a trigger is activated:
 
-The overlay designer draws the quadrilateral and optional grid in the aspect ratio of the projector output (swapped for 90- or 270-degree mapping views), but it does not show a live media preview. Use Rotate Video separately if the media itself also needs rotating.
+1. The main video pauses.
+2. The trigger video fades in and plays from the beginning.
+3. The trigger video plays over the paused main video.
+4. When the trigger ends or is skipped, the main video resumes.
 
-## Trigger behavior
+The fade duration can be changed through the JavaScript API.
 
-The trigger flow implemented in the code is:
+## Home Assistant (Optional)
 
-1. Main video pauses on its current frame
-2. Trigger video fades in
-3. The trigger video is composited over the paused main video; the Transparent Background toggle makes its black areas transparent
-4. Trigger restarts from the beginning each time it is triggered
-5. Trigger ends or is skipped, then the main video resumes
+Connect Home Assistant to trigger videos automatically using sensors.
 
-The fade time can be changed from the controller API.
+**Required settings:**
 
-## Custom API hooks
+- WebSocket URL, e.g. `ws://homeassistant.local:8123/api/websocket`
+- Long-lived access token
+- Motion sensor entity, e.g. `binary_sensor.front_motion`
 
-The controller exposes a `window.projectionMapper` object for external control:
+**Optional:** Configure a second sensor to play the main video once when triggered.
 
-```js
+When the motion sensor changes from `off` to `on`, the trigger video plays unless another trigger is already running. The optional main-video sensor plays the main video once after its configured delay.
+
+Settings are saved in your browser.
+
+## External Controls
+
+The controller exposes a JavaScript API for triggering playback from other scripts or browser-based controls.
+
+```javascript
 window.projectionMapper.trigger();
 window.projectionMapper.toggleTrigger();
 window.projectionMapper.skip();
@@ -121,61 +97,40 @@ window.projectionMapper.fadeTime = 1.5;
 window.projectionMapper.isTriggering();
 ```
 
-There are also custom events:
+You can also trigger playback using custom events:
 
-```js
+```javascript
 window.dispatchEvent(new Event('projectionmapper:trigger'));
 window.dispatchEvent(new Event('projectionmapper:toggle'));
 ```
 
-## Home Assistant integration
+## Project Structure
 
-The app can optionally connect to Home Assistant using a websocket connection. The integration is implemented in `js/homeassistant.js`; `js/controller.js` supplies the playback actions for the integration to call. The motion entity triggers the trigger video. An optional loop video entity can also trigger the loop video once; while it is configured, the loop video does not autoplay and the loop toggle is disabled. Further loop-video sensor events are ignored while that video is playing. Once playback ends, it returns to and holds on its first frame.
+```text
+.
+├── index.html          Controller
+├── output.html         Fullscreen projector output
+├── style.css           Styling
+├── js/
+│   ├── controller.js   Controller and playback controls
+│   ├── output.js       Fullscreen rendering
+│   ├── webgl.js        Video warping
+│   ├── mapping.js      Mapping and calibration
+│   ├── controls.js     Corner adjustment
+│   ├── video.js        Video playback
+│   ├── net.js          Communication between pages
+│   ├── storage.js      Saved settings
+│   └── homeassistant.js Home Assistant integration
+├── package.json
+└── README.md
+```
 
-Required settings:
+## Notes
 
-- WebSocket URL, for example `ws://homeassistant.local:8123/api/websocket` or `wss://homeassistant.local:8123/api/websocket`
-- Long-lived access token
-- Motion entity such as `binary_sensor.front_motion`
-- Optional loop video entity such as `binary_sensor.loop_video_trigger`
+- Keep the controller window open while using the projector output.
+- Both windows must use the same browser profile and origin.
+- Audio may require clicking inside the output window before playback.
+- H.264 MP4 and WebM are recommended video formats.
+- Settings are stored in browser `localStorage` and are specific to that browser profile.
+- Controller and output communicate using `BroadcastChannel`; media is shared between the two pages within the browser.
 
-The app now prefers the secure websocket scheme when the page is running over HTTPS, but the URL can still be set manually to match your Home Assistant deployment. When the motion entity changes from `off` to `on`, the trigger video fires unless one is already in progress. When the optional loop video entity changes from `off` to `on`, the loop video plays once after its separately configured delay. The settings are saved in browser localStorage.
-
-## Storage and saved mappings
-
-Mappings are saved in browser localStorage under the app namespace. The code stores:
-
-- current mapping
-- controller mapping-view rotation
-- video rotation and mirroring
-- Transparent Background toggle
-- loop state
-- volume
-- independent mute states and trigger delays
-- Home Assistant settings
-
-This means the controller remembers mapping, volume, and loop state between reloads on the same browser profile.
-
-## Communication model
-
-Controller and output communicate using `BroadcastChannel`:
-
-This is same-origin and same-browser-profile only; it does not open a network port and it does not expose the app to other machines. Media files are transferred directly between pages using the browser message channel.
-
-## Notes and limitations
-
-- Both pages must be in the same browser profile and same origin.
-- The controller should stay open; it owns the media files and resends them if the output reloads.
-- Audio is only enabled after the user interacts with the output page; otherwise the page may start muted.
-- Video compatibility depends on the browser codec support. H.264 MP4 and WebM are the safest options.
-- The project is designed primarily for Chromium-based browsers such as Chrome and Edge.
-
-## Security
-
-- No server is required for the app itself.
-- `BroadcastChannel` stays within the same browser profile and origin.
-- If you enable Home Assistant, keep the access token in a trusted browser profile and avoid sharing the session.
-
-## Starting from the repo root
-
-This repo is intentionally a static front-end project. For local use, serve the repo root directly rather than a `public/` folder because the actual files live in the project root.
