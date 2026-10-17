@@ -80,6 +80,9 @@ Connect Home Assistant to trigger videos automatically using sensors.
 - Motion sensor entity, e.g. `binary_sensor.front_motion`
 
 **Optional:** Configure a second sensor to play the main video once when triggered.
+This will allow you to only play the video when visitors arrive, instead of looping it continuously. This is useful for Halloween projections, so the projection stays idle until someone approaches the door.
+
+When the sensor changes from off to on, the main video plays once after its configured delay and then holds on its first frame until triggered again.
 
 When the motion sensor changes from `off` to `on`, the trigger video plays unless another trigger is already running. The optional main-video sensor plays the main video once after its configured delay.
 
