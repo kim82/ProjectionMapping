@@ -22,7 +22,11 @@ This project was built using AI (GitHub copilot)
   - Drag corners and edit mapping
   - Load loop/trigger media
   - Control playback, volume, and trigger state
-  - Optional Home Assistant setup
+  - Initializes the optional Home Assistant integration
+- Home Assistant integration: `js/homeassistant.js`
+  - Manages the settings dialog and Home Assistant WebSocket connection
+  - Handles motion and optional loop-video sensor events
+  - Sends sensor-triggered playback actions to the controller
 - Output page: `output.html` and `js/output.js`
   - Fullscreen projector display
   - Receives media and commands from the controller
@@ -37,6 +41,7 @@ This project was built using AI (GitHub copilot)
 ├── style.css            App styling
 ├── js/
 │   ├── controller.js    Controller logic and UI state
+│   ├── homeassistant.js Home Assistant settings, connection, and sensor events
 │   ├── output.js        Output page render loop and commands
 │   ├── net.js           BroadcastChannel connection layer
 │   ├── webgl.js         WebGL renderer and shader-based warp
@@ -125,7 +130,7 @@ window.dispatchEvent(new Event('projectionmapper:toggle'));
 
 ## Home Assistant integration
 
-The app can optionally connect to Home Assistant using a websocket connection. The motion entity triggers the trigger video. An optional loop video entity can also trigger the loop video once; while it is configured, the loop video does not autoplay and the loop toggle is disabled. Further loop-video sensor events are ignored while that video is playing. Once playback ends, it returns to and holds on its first frame.
+The app can optionally connect to Home Assistant using a websocket connection. The integration is implemented in `js/homeassistant.js`; `js/controller.js` supplies the playback actions for the integration to call. The motion entity triggers the trigger video. An optional loop video entity can also trigger the loop video once; while it is configured, the loop video does not autoplay and the loop toggle is disabled. Further loop-video sensor events are ignored while that video is playing. Once playback ends, it returns to and holds on its first frame.
 
 Required settings:
 

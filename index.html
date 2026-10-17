@@ -19,6 +19,7 @@
             <span id="out-status" class="widget" title="Click to open output screen">Connecting...</span>
             <span id="ha-status" class="widget" aria-live="polite" title="Click to open Home Assistant settings">
                 <span id="ha-led" class="ha-dot"></span>
+                <span id="ha-led2" class="ha-dot"></span>
                 <span id="ha-status-text">Home Assistant Disconnected</span>
             </span>
         </span>
@@ -40,19 +41,17 @@
                 title="Reset corners, mapping-view rotation, video rotation, and mirroring">🗑 Reset All</button>
         </div>
         <div class="row">
-        </div>
-        <div class="row">
             <button id="play" title="Play">▶</button>
             <button id="restart" title="Restart video">⏮</button>
             <button id="loop" class="toggle" title="Loop video">⟳</button>
             <input id="seek" type="range" min="0" max="1000" value="0"><span id="time">0:00 / 0:00</span>
         </div>
         <div class="row">
-            <div class="col">
+            <div class="col group">
             <span class="groupLabel">Volume</span>
             <input id="vol" type="range" min="0" max="1" step="0.01" value="1">
             </div>
-            <div class="col">
+            <div class="col group">
                 <span class="groupLabel">Main video</span>
                 <div class="row">
                     <button id="mute" title="Mute loop video" aria-label="Mute loop video">🔈</button>
@@ -60,7 +59,7 @@
                     <input id="loopVideoTriggerDelay" type="range" min="0" max="60" step="1" value="0">
                 </div>
             </div>
-            <div class="col">
+            <div class="col group">
                 <span class="groupLabel">Trigger video</span>
                 <div class="row">
                     <button id="trigger" title="Play the trigger video (T)">Trigger (T)</button>
@@ -85,10 +84,10 @@
             <label>Access token
                 <input id="ha-token" type="password" placeholder="Long-lived access token" required>
             </label>
-            <label>Motion entity
-                <input id="ha-motion-entity" type="text" placeholder="binary_sensor.front_motion" required>
+            <label>Motion entity for the trigger
+                <input id="ha-trigger-entity" type="text" placeholder="binary_sensor.front_motion" required>
             </label>
-            <label>Loop video entity (optional)
+            <label>Motion entity to start the main video (optional)
                 <input id="ha-loop-video-entity" type="text" placeholder="binary_sensor.loop_video_trigger">
             </label>
             <div class="dialog-actions">

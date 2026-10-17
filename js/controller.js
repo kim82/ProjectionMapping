@@ -2,6 +2,7 @@ import { connect } from './net.js?v=20261005';
 import { DEFAULT, clone } from './mapping.js?v=20261005';
 import { Calibration } from './controls.js?v=20261016';
 import * as store from './storage.js?v=20261005';
+import { initializeHomeAssistant, loopVideoSensorConfigured } from './homeassistant.js?v=20261017';
 
 const getElement = id => document.getElementById(id);
 const formatTime = seconds => Number.isFinite(seconds)
@@ -13,8 +14,6 @@ const normalizeRotation = degrees => Number.isFinite(degrees)
   : 0;
 
 const savedState = store.getState();
-const savedHASettings = store.getHASettings();
-const loopVideoSensorConfigured = !!savedHASettings.loopVideoEntity;
 let mapping = savedState.mapping ? clone(savedState.mapping) : clone(DEFAULT);
 let outputStatus = {};
 let mediaNames = {};
@@ -176,208 +175,6 @@ setInterval(() => {
     isConnected ? 'Output screen connected' : 'Output screen not connected - click to open'
   );
 }, 500);
-
-function setHomeAssistantStatus(isConnected, message) {
-  const statusElement = getElement('ha-status');
-  const ledElement = getElement('ha-led');
-  const statusText = getElement('ha-status-text');
-  const connected = !!isConnected;
-  
-  statusElement.classList.toggle('connected', connected);
-  ledElement.classList.toggle('connected', connected);
-  statusText.textContent = message || (connected ? 'HA Connected' : 'HA Disconnected');
-}
-
-function showMotionDetected() {
-  const motionLed = getElement('ha-led');
-  motionLed.classList.add('motion');
-  clearTimeout(window.__haMotionBlink);
-  window.__haMotionBlink = setTimeout(() => motionLed.classList.remove('motion'), 5000);
-}
-
-function updateLoopVideoSensorMode(isConfigured) {
-  controllerState.loopVideoAutoplay = !isConfigured;
-  const loopToggle = getElement('loop');
-  loopToggle.disabled = isConfigured;
-  loopToggle.title = isConfigured
-    ? 'Loop video sensor is configured; loop playback is disabled'
-    : 'Loop video';
-
-  if (isConfigured) {
-    controllerState.loop = false;
-    store.setState({ loop: false });
-    setToggle('loop', false);
-    sendCommand('loop', { on: false });
-  }
-  sendCommand('loopAutoplay', { on: controllerState.loopVideoAutoplay });
-}
-
-function fillHomeAssistantForm() {
-  const settings = store.getHASettings();
-  getElement('ha-url').value = settings.url;
-  getElement('ha-token').value = settings.token;
-  getElement('ha-motion-entity').value = settings.motionEntity;
-  getElement('ha-loop-video-entity').value = settings.loopVideoEntity || '';
-}
-
-function openHomeAssistantSettings() {
-  fillHomeAssistantForm();
-  const dialog = getElement('ha-dialog');
-  if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
-}
-
-function closeHomeAssistantSettings() {
-  const dialog = getElement('ha-dialog');
-  if (dialog && dialog.open) dialog.close();
-}
-
-function saveHomeAssistantSettings(event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  const settings = {
-    url: getElement('ha-url').value.trim(),
-    token: getElement('ha-token').value.trim(),
-    motionEntity: getElement('ha-motion-entity').value.trim(),
-    loopVideoEntity: getElement('ha-loop-video-entity').value.trim()
-  };
-
-  if (!settings.url || !settings.token || !settings.motionEntity) {
-    alert('Please enter the Home Assistant WebSocket URL, access token, and motion entity.');
-    return;
-  }
-
-  store.saveHASettings(settings);
-  updateLoopVideoSensorMode(!!settings.loopVideoEntity);
-  closeHomeAssistantSettings();
-  clearTimeout(homeAssistantReconnectTimer);
-  if (homeAssistantSocket) {
-    homeAssistantSocket.onclose = null;
-    homeAssistantSocket.close();
-    homeAssistantSocket = null;
-  }
-  connectToHomeAssistant();
-}
-
-let homeAssistantSocket = null;
-let homeAssistantMessageId = 1;
-let homeAssistantReconnectTimer = null;
-
-function subscribeToMotionEvents() {
-  if (!homeAssistantSocket || homeAssistantSocket.readyState !== WebSocket.OPEN) return;
-
-  homeAssistantSocket.send(JSON.stringify({
-    id: homeAssistantMessageId++,
-    type: 'subscribe_events',
-    event_type: 'state_changed'
-  }));
-}
-
-function handleMotionDetected() {
-  const projection = window.projectionMapper;
-  if (projection && typeof projection.isTriggering === 'function' && projection.isTriggering()) {
-    console.log('Motion detected!');
-    showMotionDetected();
-    return;
-  }
-
-  console.log('Motion detected! Triggering projection.');
-  showMotionDetected();
-  if (projection && typeof projection.trigger === 'function') projection.trigger();
-}
-
-function handleLoopVideoSensorDetected() {
-  console.log('Loop video sensor detected. Triggering loop video.');
-  showMotionDetected();
-  const projection = window.projectionMapper;
-  if (projection && typeof projection.loopVideoTrigger === 'function') {
-    projection.loopVideoTrigger();
-  }
-}
-
-function connectToHomeAssistant() {
-  const settings = store.getHASettings();
-  if (!settings.url || !settings.token || !settings.motionEntity) {
-    setHomeAssistantStatus(false, 'Needs config');
-    return;
-  }
-
-  if (
-    homeAssistantSocket
-    && (
-      homeAssistantSocket.readyState === WebSocket.OPEN
-      || homeAssistantSocket.readyState === WebSocket.CONNECTING
-    )
-  ) {
-    return;
-  }
-
-  setHomeAssistantStatus(false, 'Connecting…');
-  homeAssistantSocket = new WebSocket(settings.url);
-
-  homeAssistantSocket.onopen = () => {
-    homeAssistantSocket.send(JSON.stringify({
-      type: 'auth',
-      access_token: settings.token
-    }));
-  };
-
-  homeAssistantSocket.onmessage = event => {
-    const message = JSON.parse(event.data);
-
-    if (message.type === 'auth_required') {
-      homeAssistantSocket.send(JSON.stringify({
-        type: 'auth',
-        access_token: settings.token
-      }));
-      return;
-    }
-    if (message.type === 'auth_ok') {
-      setHomeAssistantStatus(true, 'Home Assistant Connected');
-      subscribeToMotionEvents();
-      return;
-    }
-    if (message.type === 'auth_invalid') {
-      setHomeAssistantStatus(false, 'Home Assistant Auth failed');
-      homeAssistantSocket.close();
-      return;
-    }
-
-    if (message.type === 'event' && message.event?.event_type === 'state_changed') {
-      const eventData = message.event.data;
-      const entityId = eventData?.entity_id;
-      const newState = eventData?.new_state?.state;
-      const oldState = eventData?.old_state?.state;
-
-      if (entityId === settings.motionEntity && newState === 'on' && oldState !== 'on') {
-        handleMotionDetected();
-      }
-      if (
-        settings.loopVideoEntity
-        && entityId === settings.loopVideoEntity
-        && newState === 'on'
-        && oldState !== 'on'
-      ) {
-        handleLoopVideoSensorDetected();
-      }
-    }
-  };
-
-  homeAssistantSocket.onclose = () => {
-    setHomeAssistantStatus(false, 'Home Assistant Disconnected');
-    clearTimeout(homeAssistantReconnectTimer);
-    homeAssistantReconnectTimer = setTimeout(connectToHomeAssistant, 5000);
-  };
-
-  homeAssistantSocket.onerror = () => setHomeAssistantStatus(false, 'HA Connection error');
-}
-
-getElement('ha-status').addEventListener('click', openHomeAssistantSettings);
-getElement('ha-dialog-close').addEventListener('click', closeHomeAssistantSettings);
-getElement('ha-dialog-cancel').addEventListener('click', closeHomeAssistantSettings);
-getElement('ha-form').addEventListener('submit', saveHomeAssistantSettings);
 
 function uploadMedia(slot, file) {
   if (slot === 'loop') {
@@ -610,6 +407,9 @@ if (loopVideoSensorConfigured && savedState.loop) store.setState({ loop: false }
 setToggle('loop', controllerState.loop);
 sendInitialState();
 setOutputConnectionStatus(false, 'Output screen not connected');
-setHomeAssistantStatus(false, 'Home Assistant Disconnected');
-connectToHomeAssistant();
+initializeHomeAssistant({
+  controllerState,
+  sendCommand,
+  setToggle
+});
 fitCalibrationOverlay();
