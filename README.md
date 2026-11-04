@@ -46,8 +46,8 @@ Use the controller window to configure and control your projection.
 | Control | Description |
 |---|---|
 | Load video | Select the main looping video |
-| Load trigger video | Select the video played when triggered |
-| Trigger (`T`) | Play the trigger video |
+| Load Trigger video 1 / 2 | Select either trigger video |
+| Trigger 1 / 2 (`1` / `2`) | Play the corresponding trigger video |
 | Test Pattern | Display a pattern for alignment |
 | Mirror Video | Flip videos horizontally |
 | Rotate Video | Rotate videos in 90° steps |
@@ -55,7 +55,7 @@ Use the controller window to configure and control your projection.
 | Play / Restart | Play or restart the main video |
 | Loop | Enable or disable looping |
 | Transparent Background | Make black areas of the trigger video transparent |
-| Video Delay | Set a delay for the main or trigger video |
+| Video Delay | Set a delay for the trigger video |
 | Reset All | Restore the default mapping and video orientation |
 
 You can also adjust playback position, volume, and mute settings. Mapping changes are saved automatically.
@@ -77,14 +77,16 @@ Connect Home Assistant to trigger videos automatically using sensors.
 
 - WebSocket URL, e.g. `ws://homeassistant.local:8123/api/websocket`
 - Long-lived access token
-- Motion sensor entity, e.g. `binary_sensor.front_motion`
+- Entity for Trigger video 1, e.g. `binary_sensor.front_motion`
+
+**Optional:** Configure a second entity to play Trigger video 2.
 
 **Optional:** Configure a second sensor to play the main video once when triggered.
 This will allow you to only play the video when visitors arrive, instead of looping it continuously. This is useful for Halloween projections, so the projection stays idle until someone approaches the door.
 
 When the sensor changes from off to on, the main video plays once after its configured delay and then holds on its first frame until triggered again.
 
-When the motion sensor changes from `off` to `on`, the trigger video plays unless another trigger is already running. The optional main-video sensor plays the main video once after its configured delay.
+When a motion sensor changes from `off` to `on`, its corresponding trigger video plays unless another trigger is already running. The optional main-video sensor plays the main video once.
 
 Settings are saved in your browser.
 

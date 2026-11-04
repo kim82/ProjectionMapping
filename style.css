@@ -282,7 +282,8 @@ body.projection #stage {
     display: none
 }
 
-#trigger.on {
+#trigger1.on,
+#trigger2.on {
     background: var(--acc);
     color: #111
 }

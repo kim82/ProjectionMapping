@@ -22,21 +22,25 @@ let isTriggerMutedByUser = false;
 let triggerTransparency = true;
 let loopVideoAutoplay = true;
 let masterVolume = 1;
+let triggerMasterVolume = 1;
 let isMirroredHorizontally = false;
 let videoRotationDegrees = 0;
 let triggerState = 'idle';
 let triggerMix = 0;
+let activeTriggerIndex = null;
 let fadeDuration = 0.6;
 let triggerDelaySec = 0;
-let loopVideoTriggerDelaySec = 0;
 let pendingTriggerTimeout = null;
-let pendingLoopVideoTriggerTimeout = null;
 let shouldResumeLoopAfterTrigger = false;
 let previousFrameTime = performance.now();
 
 const loopVideo = new VideoSource();
-const triggerVideo = new VideoSource();
-triggerVideo.el.loop = false;
+const triggerVideos = [null, new VideoSource(), new VideoSource()];
+triggerVideos.slice(1).forEach(video => video.el.loop = false);
+
+function getActiveTriggerVideo() {
+  return activeTriggerIndex === null ? null : triggerVideos[activeTriggerIndex];
+}
 
 loopVideo.el.addEventListener('ended', () => {
   loopVideo.el.currentTime = 0;
@@ -114,7 +118,7 @@ renderer.onLost = () => {
 
 function applyMute() {
   loopVideo.el.muted = isLoopMutedByUser;
-  triggerVideo.el.muted = isTriggerMutedByUser;
+  triggerVideos.slice(1).forEach(video => video.el.muted = isTriggerMutedByUser);
 }
 
 function cancelPendingTrigger() {
@@ -125,45 +129,43 @@ function cancelPendingTrigger() {
   return true;
 }
 
-function trigger() {
+function trigger(index = 1) {
+  if (index !== 1 && index !== 2) return;
+  const triggerVideo = triggerVideos[index];
   if (!triggerVideo.loaded) return;
 
-  if (cancelPendingTrigger()) {
-    skipTrigger();
-    return;
+  cancelPendingTrigger();
+  if (triggerState !== 'idle') {
+    getActiveTriggerVideo()?.el.pause();
+    triggerMix = 0;
+  } else {
+    shouldResumeLoopAfterTrigger = !loopVideo.el.paused && !loopVideo.el.ended;
   }
 
   showTestPattern = false;
-  shouldResumeLoopAfterTrigger = !loopVideo.el.paused && !loopVideo.el.ended;
+  activeTriggerIndex = index;
   triggerVideo.el.currentTime = 0;
+  triggerVideo.dirty = true;
   pendingTriggerTimeout = setTimeout(() => {
     pendingTriggerTimeout = null;
-    console.log('Triggering video with delay of', triggerDelaySec, 'seconds');
+    console.log(`Triggering video ${index} with delay of`, triggerDelaySec, 'seconds');
     if (shouldResumeLoopAfterTrigger) loopVideo.el.pause();
     triggerVideo.start();
   }, Number(triggerDelaySec * 1000) || 0);
 
-  if (triggerState === 'idle' || triggerState === 'fadeout') {
-    triggerState = 'fadein';
-  }
+  triggerState = 'fadein';
 }
 
 function loopVideoTrigger() {
   if (!loopVideo.loaded) return;
   if (!loopVideo.el.paused && !loopVideo.el.ended) return;
 
-  if (pendingLoopVideoTriggerTimeout !== null) {
-    clearTimeout(pendingLoopVideoTriggerTimeout);
-  }
   showTestPattern = false;
   loopVideo.el.loop = false;
   loopVideo.el.pause();
   loopVideo.el.currentTime = 0;
-  pendingLoopVideoTriggerTimeout = setTimeout(() => {
-    pendingLoopVideoTriggerTimeout = null;
-    shouldResumeLoopAfterTrigger = true;
-    loopVideo.start();
-  }, Number(loopVideoTriggerDelaySec * 1000) || 0);
+  shouldResumeLoopAfterTrigger = true;
+  loopVideo.start();
 }
 
 function fadeOut() {
@@ -174,20 +176,24 @@ function fadeOut() {
 function skipTrigger() {
   cancelPendingTrigger();
   if (triggerState !== 'fadein' && triggerState !== 'playing') return;
-  triggerVideo.el.pause();
+  getActiveTriggerVideo()?.el.pause();
   fadeOut();
 }
 
-function toggleTrigger() {
-  if (triggerState === 'fadein' || triggerState === 'playing') {
+function toggleTrigger(index = 1) {
+  if (activeTriggerIndex === index && (triggerState === 'fadein' || triggerState === 'playing')) {
     skipTrigger();
   } else {
-    trigger();
+    trigger(index);
   }
 }
 
-triggerVideo.el.addEventListener('ended', () => {
-  if (triggerState === 'fadein' || triggerState === 'playing') fadeOut();
+triggerVideos.slice(1).forEach((video, index) => {
+  video.el.addEventListener('ended', () => {
+    if (activeTriggerIndex === index + 1 && (triggerState === 'fadein' || triggerState === 'playing')) {
+      fadeOut();
+    }
+  });
 });
 
 function updatePlayback() {
@@ -207,7 +213,8 @@ function updatePlayback() {
     triggerMix = Math.max(0, triggerMix - deltaSeconds / fadeDurationSeconds);
     if (triggerMix <= 0) {
       triggerState = 'idle';
-      triggerVideo.el.pause();
+      getActiveTriggerVideo()?.el.pause();
+      activeTriggerIndex = null;
       if (shouldResumeLoopAfterTrigger) loopVideo.start();
       shouldResumeLoopAfterTrigger = false;
     }
@@ -215,18 +222,24 @@ function updatePlayback() {
   if (!triggerTransparency) {
     const isIdle = triggerState === 'idle';
     loopVideo.el.volume = isIdle ? masterVolume : masterVolume * (1 - triggerMix);
-    triggerVideo.el.volume = isIdle ? 0 : masterVolume * triggerMix;
+    triggerVideos.slice(1).forEach((video, index) => {
+      video.el.volume = activeTriggerIndex === index + 1 && !isIdle
+        ? triggerMasterVolume * triggerMix
+        : 0;
+    });
   }
   else {
     loopVideo.el.volume = masterVolume;
-    triggerVideo.el.volume = masterVolume;
+    triggerVideos.slice(1).forEach(video => video.el.volume = triggerMasterVolume);
   }
 }
 
 function loadMedia(mediaSlot, file) {
   if (!(file instanceof Blob)) return;
 
-  const videoSource = mediaSlot === 'loop' ? loopVideo : triggerVideo;
+  const videoSource = mediaSlot === 'loop'
+    ? loopVideo
+    : triggerVideos[mediaSlot === 'trigger2' ? 2 : 1];
   videoSource.load(file);
   if (mediaSlot === 'loop' && hasStarted && loopVideoAutoplay) loopVideo.start();
 }
@@ -243,6 +256,7 @@ const commands = {
     }
   },
   volume: message => masterVolume = message.v,
+  triggerVolume: message => triggerMasterVolume = message.v,
   mute: message => {
     isLoopMutedByUser = message.on;
     applyMute();
@@ -260,7 +274,6 @@ const commands = {
   rotate: message => videoRotationDegrees = message.degrees,
   fade: message => fadeDuration = message.s,
   triggerDelay: message => triggerDelaySec = message.s,
-  loopVideoTriggerDelay: message => loopVideoTriggerDelaySec = message.s,
   loopVideoTrigger,
   play: () => loopVideo.start(),
   pause: () => loopVideo.el.pause(),
@@ -270,8 +283,8 @@ const commands = {
       loopVideo.el.currentTime = message.p * loopVideo.el.duration;
     }
   },
-  trigger,
-  toggle: toggleTrigger,
+  trigger: message => trigger(message.index),
+  toggle: message => toggleTrigger(message.index),
   skip: skipTrigger
 };
 
@@ -283,6 +296,7 @@ function handleMessage(message) {
     loopVideoAutoplay = initialState.loopVideoAutoplay !== false;
     loopVideo.el.loop = loopVideoAutoplay && !!initialState.loop;
     masterVolume = initialState.volume;
+    triggerMasterVolume = initialState.triggerVolume ?? 1;
     isLoopMutedByUser = !!initialState.loopMuted;
     isTriggerMutedByUser = !!initialState.triggerMuted;
     triggerTransparency = initialState.triggerTransparency !== false;
@@ -290,7 +304,6 @@ function handleMessage(message) {
     videoRotationDegrees = initialState.videoRotationDegrees ?? 0;
     fadeDuration = initialState.fadeTime;
     triggerDelaySec = initialState.triggerDelay ?? 0;
-    loopVideoTriggerDelaySec = initialState.loopVideoTriggerDelay ?? 0;
     applyMute();
 
     for (const [mediaSlot, file] of Object.entries(message.media || {})) {
@@ -312,6 +325,7 @@ setInterval(() => channel.send({
   duration: loopVideo.el.duration || 0,
   paused: loopVideo.el.paused,
   state: triggerState,
+  triggerIndex: activeTriggerIndex,
   test: showTestPattern,
   loopMuted: isLoopMutedByUser,
   triggerMuted: isTriggerMutedByUser,
@@ -335,8 +349,8 @@ window.addEventListener('keydown', event => {
       document.documentElement.requestFullscreen?.().catch(() => {});
     }
   }
-  if ((event.key === 't' || event.key === 'T') && !event.repeat) {
-    toggleTrigger();
+  if ((event.key === '1' || event.key === '2') && !event.repeat) {
+    toggleTrigger(Number(event.key));
   }
 });
 
@@ -345,8 +359,9 @@ function drawFrame() {
 
   if (!showTestPattern) {
     if (loopVideo.needsUpload()) renderer.upload('video', loopVideo.el);
-    if (triggerState !== 'idle' && triggerVideo.needsUpload()) {
-      renderer.upload('trigger', triggerVideo.el);
+    const activeTriggerVideo = getActiveTriggerVideo();
+    if (triggerState !== 'idle' && activeTriggerVideo?.needsUpload()) {
+      renderer.upload('trigger', activeTriggerVideo.el);
     }
   }
 

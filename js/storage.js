@@ -12,7 +12,8 @@ function getDefaultHomeAssistantUrl() {
 const DEFAULT_HOME_ASSISTANT_SETTINGS = {
   url: getDefaultHomeAssistantUrl(),
   token: '',
-  motionEntity: 'binary_sensor.motion_sensor_occupancy'
+  motionEntity: '',
+  motionEntity2: ''
 };
 
 function readStorage() {

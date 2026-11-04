@@ -1,4 +1,4 @@
-import * as store from './storage.js?v=20261005';
+import * as store from './storage.js?v=20261104';
 
 const getElement = id => document.getElementById(id);
 const savedHASettings = store.getHASettings();
@@ -55,6 +55,7 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
         getElement('ha-url').value = settings.url;
         getElement('ha-token').value = settings.token;
         getElement('ha-trigger-entity').value = settings.motionEntity;
+        getElement('ha-trigger2-entity').value = settings.motionEntity2 || '';
         getElement('ha-loop-video-entity').value = settings.loopVideoEntity || '';
     }
 
@@ -79,11 +80,15 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
             url: getElement('ha-url').value.trim(),
             token: getElement('ha-token').value.trim(),
             motionEntity: getElement('ha-trigger-entity').value.trim(),
+            motionEntity2: getElement('ha-trigger2-entity').value.trim(),
             loopVideoEntity: getElement('ha-loop-video-entity').value.trim()
         };
 
-        if (!settings.url || !settings.token || !settings.motionEntity) {
-            alert('Please enter the Home Assistant WebSocket URL, access token, and motion entity.');
+        const hasConfiguredSensors = !!(
+            settings.motionEntity || settings.motionEntity2 || settings.loopVideoEntity
+        );
+        if (hasConfiguredSensors && (!settings.url || !settings.token)) {
+            alert('Enter the Home Assistant WebSocket URL and access token to use configured sensors.');
             return;
         }
 
@@ -107,6 +112,8 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
         const entities = [];
         if (settings.motionEntity)
             entities.push(settings.motionEntity);
+        if (settings.motionEntity2)
+            entities.push(settings.motionEntity2);
         if (settings.loopVideoEntity)
             entities.push(settings.loopVideoEntity);
 
@@ -114,14 +121,22 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
             homeAssistantSocket.send(JSON.stringify({
                 id: homeAssistantMessageId++,
                 type: 'subscribe_entities',
-                entity_ids: ["binary_sensor.motion_sensor_occupancy"]
+                entity_ids: entities
             }));
         }
 
     }
     function connectToHomeAssistant() {
         const settings = store.getHASettings();
-        if (!settings.url || !settings.token || !settings.motionEntity) {
+        const hasConfiguredSensors = !!(
+            settings.motionEntity || settings.motionEntity2 || settings.loopVideoEntity
+        );
+        if (!hasConfiguredSensors) {
+            setHomeAssistantStatus(false, 'No sensors configured');
+            return;
+        }
+
+        if (!settings.url || !settings.token) {
             setHomeAssistantStatus(false, 'Needs config');
             return;
         }
@@ -173,15 +188,22 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
 
                 if (settings.loopVideoEntity && changed[settings.loopVideoEntity] && changed[settings.loopVideoEntity]['+']) {
                     var loopVideoEntityState = changed[settings.loopVideoEntity]['+']['s'];
-                    if (loopVideoEntityState == 'on')
+                    if (loopVideoEntityState != 'off')
                         handleLoopVideoSensorDetected();
                     return;
                 }
                 
+                if (settings.motionEntity2 && changed[settings.motionEntity2] && changed[settings.motionEntity2]['+']) {
+                    var motionEntity2State = changed[settings.motionEntity2]['+']['s'];
+                    if (motionEntity2State != 'off')
+                        handleMotionDetected(2);
+                    return;
+                }
+
                 if (settings.motionEntity && changed[settings.motionEntity] && changed[settings.motionEntity]['+']) {
                     var motionEntityState = changed[settings.motionEntity]['+']['s'];
-                    if (motionEntityState == 'on') 
-                        handleMotionDetected();
+                    if (motionEntityState != 'off') 
+                        handleMotionDetected(1);
                     return;
                 }
             }
@@ -196,7 +218,7 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
         homeAssistantSocket.onerror = () => setHomeAssistantStatus(false, 'HA Connection error');
     }
 
-    function handleMotionDetected() {
+    function handleMotionDetected(triggerIndex) {
         const projection = window.projectionMapper;
         if (projection && typeof projection.isTriggering === 'function' && projection.isTriggering()) {
             console.log('Motion detected! Video is already playing');
@@ -206,7 +228,7 @@ export function initializeHomeAssistant({ controllerState, sendCommand, setToggl
 
         console.log('Motion detected! Triggering projection.');
         showMotionDetected();
-        if (projection && typeof projection.trigger === 'function') projection.trigger();
+        if (projection && typeof projection.trigger === 'function') projection.trigger(triggerIndex);
     }
 
     function handleLoopVideoSensorDetected() {

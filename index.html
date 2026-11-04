@@ -1,20 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Projection Mapper</title>
-    <link rel="stylesheet" href="style.css?v=20261005">
+    <link rel="stylesheet" href="style.css?v=20261104">
     <link rel="icon" href="image/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="image/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="image/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="image/favicon-16x16.png">
 </head>
+
 <body>
     <header id="top">
         <h1>Projection Mapper</h1>
-        <span id="load" class="widget" title="">Load video...</span><input id="file" type="file" accept="video/*" hidden>
-        <span id="loadtrig" class="widget" title="">Load trigger video...</span><input id="file2" type="file" accept="video/*" hidden>
+        <span id="load" class="widget" title="">Load video...</span><input id="file" type="file" accept="video/*"
+            hidden>
+        <span id="loadtrig" class="widget" title="">Load Trigger video 1...</span><input id="file2"
+            type="file" accept="video/*" hidden>
+        <span id="loadtrig2" class="widget" title="">Load Trigger video 2...</span><input id="file3"
+            type="file" accept="video/*" hidden>
         <span class="widgetgroup right">
             <span id="out-status" class="widget" title="Click to open output screen">Connecting...</span>
             <span id="ha-status" class="widget" aria-live="polite" title="Click to open Home Assistant settings">
@@ -32,11 +38,12 @@
         <div class="row">
             <button id="test" class="toggle">🔧 Test Pattern</button>
             <button id="mirror" class="toggle" aria-pressed="false">⮀ Mirror Video</button>
-            <button id="rotate" type="button"
-                aria-label="Rotate video 90 degrees; current rotation 0 degrees">⭯ Rotate Video (0°)</button>
+            <button id="rotate" type="button" aria-label="Rotate video 90 degrees; current rotation 0 degrees">⭯ Rotate
+                Video (0°)</button>
             <button id="rotate-mapping" type="button"
                 title="Rotate the mapping view to match a physically rotated output screen"
-                aria-label="Rotate mapping view 90 degrees clockwise; current rotation 0 degrees">⭯ Rotate Mapping (0°)</button>
+                aria-label="Rotate mapping view 90 degrees clockwise; current rotation 0 degrees">⭯ Rotate Mapping
+                (0°)</button>
             <button id="reset" type="button"
                 title="Reset corners, mapping-view rotation, video rotation, and mirroring">🗑 Reset All</button>
         </div>
@@ -48,22 +55,28 @@
         </div>
         <div class="row">
             <div class="col group">
-            <span class="groupLabel">Volume</span>
-            <input id="vol" type="range" min="0" max="1" step="0.01" value="1">
-            </div>
-            <div class="col group">
                 <span class="groupLabel">Main video</span>
                 <div class="row">
                     <button id="mute" title="Mute loop video" aria-label="Mute loop video">🔈</button>
-                    <label for="loopVideoTriggerDelay" id="loopVideoTriggerDelayLabel">Video delay (0)</label>
-                    <input id="loopVideoTriggerDelay" type="range" min="0" max="60" step="1" value="0">
+                    <label for="vol">Volume</label>
+                    <input id="vol" type="range" min="0" max="1" step="0.01" value="1">
                 </div>
             </div>
             <div class="col group">
-                <span class="groupLabel">Trigger video</span>
+                <span class="groupLabel">Trigger videos</span>
                 <div class="row">
-                    <button id="trigger" title="Play the trigger video (T)">Trigger (T)</button>
+                    <button id="trigger1" class="toggle" aria-pressed="false"
+                        title="Play or stop Trigger video 1 (1)">Trigger 1 (1)</button>
+                    <button id="trigger2" class="toggle" aria-pressed="false"
+                        title="Play or stop Trigger video 2 (2)">Trigger 2 (2)</button>
                     <button id="triggerMute" title="Mute trigger video" aria-label="Mute trigger video">🔈</button>
+                    <label for="triggerVol">Volume</label>
+                    <input id="triggerVol" type="range" min="0" max="1" step="0.01" value="1" title="100%">
+                </div>
+            </div>
+            <div class="col group">
+                <span class="groupLabel">Trigger video setup</span>
+                <div class="row">
                     <button id="triggerTransparency" class="toggle" type="button" aria-pressed="true"
                         title="Black areas will appear transparent.">Transparent Background</button>
                     <label for="triggerDelay" id="triggerDelayLabel">Video delay (0)</label>
@@ -79,15 +92,18 @@
                 <button type="button" id="ha-dialog-close" class="icon-button" aria-label="Close">×</button>
             </div>
             <label>WebSocket URL
-                <input id="ha-url" type="url" placeholder="wss://homeassistant.local:8123/api/websocket" required>
+                <input id="ha-url" type="url" placeholder="wss://homeassistant.local:8123/api/websocket">
             </label>
             <label>Access token
-                <input id="ha-token" type="password" placeholder="Long-lived access token" required>
+                <input id="ha-token" type="password" placeholder="Long-lived access token">
             </label>
-            <label>Motion entity for the trigger
-                <input id="ha-trigger-entity" type="text" placeholder="binary_sensor.front_motion" required>
+            <label>Entity for Trigger video 1
+                <input id="ha-trigger-entity" type="text" placeholder="binary_sensor.button_1">
             </label>
-            <label>Motion entity to start the main video (optional)
+            <label>Entity for Trigger video 2
+                <input id="ha-trigger2-entity" type="text" placeholder="binary_sensor.button_2">
+            </label>
+            <label>Entity to start the main video
                 <input id="ha-loop-video-entity" type="text" placeholder="binary_sensor.loop_video_trigger">
             </label>
             <div class="dialog-actions">
@@ -96,6 +112,7 @@
             </div>
         </form>
     </dialog>
-        <script type="module" src="js/controller.js?v=20261016"></script>
+    <script type="module" src="js/controller.js?v=20261104"></script>
 </body>
+
 </html>

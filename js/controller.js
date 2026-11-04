@@ -1,8 +1,8 @@
 import { connect } from './net.js?v=20261005';
 import { DEFAULT, clone } from './mapping.js?v=20261005';
 import { Calibration } from './controls.js?v=20261016';
-import * as store from './storage.js?v=20261005';
-import { initializeHomeAssistant, loopVideoSensorConfigured } from './homeassistant.js?v=20261017';
+import * as store from './storage.js?v=20261104';
+import { initializeHomeAssistant, loopVideoSensorConfigured } from './homeassistant.js?v=20261104';
 
 const getElement = id => document.getElementById(id);
 const formatTime = seconds => Number.isFinite(seconds)
@@ -26,12 +26,12 @@ const controllerState = {
   loop: !!savedState.loop && !loopVideoSensorConfigured,
   loopVideoAutoplay: !loopVideoSensorConfigured,
   volume: savedState.volume ?? 1,
+  triggerVolume: savedState.triggerVolume ?? 1,
   loopMuted: !!savedState.loopMuted,
   triggerMuted: !!savedState.triggerMuted,
   triggerTransparency: savedState.triggerTransparency !== false,
   fadeTime: 0.6,
   triggerDelay: savedState.triggerDelay ?? 0,
-  loopVideoTriggerDelay: savedState.loopVideoTriggerDelay ?? 0,
   mirrorHorizontal: !!savedState.mirrorHorizontal,
   videoRotationDegrees: normalizeRotation(savedState.videoRotationDegrees),
   test: false
@@ -42,12 +42,12 @@ const commandStateFields = {
   loop: ['loop', 'on'],
   loopAutoplay: ['loopVideoAutoplay', 'on'],
   volume: ['volume', 'v'],
+  triggerVolume: ['triggerVolume', 'v'],
   loopMute: ['loopMuted', 'on'],
   triggerMute: ['triggerMuted', 'on'],
   triggerTransparency: ['triggerTransparency', 'on'],
   fade: ['fadeTime', 's'],
   triggerDelay: ['triggerDelay', 's'],
-  loopVideoTriggerDelay: ['loopVideoTriggerDelay', 's'],
   mirror: ['mirrorHorizontal', 'on'],
   rotate: ['videoRotationDegrees', 'degrees']
 };
@@ -93,9 +93,13 @@ function showMediaNames() {
     getElement('load').classList.add('connected');
   }
   
-  if (mediaNames['trigger'] != undefined) {
-    getElement('loadtrig').textContent = "Trigger: " + mediaNames['trigger'].name;
+  if (mediaNames['trigger1'] != undefined) {
+    getElement('loadtrig').textContent = "Trigger 1: " + mediaNames['trigger1'].name;
     getElement('loadtrig').classList.add('connected');
+  }
+  if (mediaNames['trigger2'] != undefined) {
+    getElement('loadtrig2').textContent = "Trigger 2: " + mediaNames['trigger2'].name;
+    getElement('loadtrig2').classList.add('connected');
   }
 }
 
@@ -127,7 +131,11 @@ function renderOutputStatus() {
   const triggerMuted = outputStatus.triggerMuted ?? controllerState.triggerMuted;
   getElement('mute').innerText = loopMuted ? '🔇' : '🔈';
   getElement('triggerMute').innerText = triggerMuted ? '🔇' : '🔈';
-  setToggle('trigger', outputStatus.state && outputStatus.state !== 'idle');
+  const isTriggering = outputStatus.state && outputStatus.state !== 'idle';
+  setToggle('trigger1', isTriggering && outputStatus.triggerIndex === 1);
+  setToggle('trigger2', isTriggering && outputStatus.triggerIndex === 2);
+  getElement('trigger1').setAttribute('aria-pressed', String(isTriggering && outputStatus.triggerIndex === 1));
+  getElement('trigger2').setAttribute('aria-pressed', String(isTriggering && outputStatus.triggerIndex === 2));
 
   if (outputStatus.duration) {
     getElement('time').textContent = `${formatTime(outputStatus.time)} / ${formatTime(outputStatus.duration)}`;
@@ -182,7 +190,7 @@ function uploadMedia(slot, file) {
     store.setState({ loopMuted: false });
     sendCommand('loopMute', { on: false });
     getElement('mute').innerText = '🔈';
-  } else if (slot === 'trigger') {
+  } else if (slot === 'trigger1' || slot === 'trigger2') {
     controllerState.triggerMuted = false;
     store.setState({ triggerMuted: false });
     sendCommand('triggerMute', { on: false });
@@ -197,16 +205,22 @@ function uploadMedia(slot, file) {
 
 getElement('load').onclick = () => getElement('file').click();
 getElement('loadtrig').onclick = () => getElement('file2').click();
+getElement('loadtrig2').onclick = () => getElement('file3').click();
 getElement('file').onchange = event => {
   const file = event.target.files[0];
   if (file) uploadMedia('loop', file);
 };
 getElement('file2').onchange = event => {
   const file = event.target.files[0];
-  if (file) uploadMedia('trigger', file);
+  if (file) uploadMedia('trigger1', file);
+};
+getElement('file3').onchange = event => {
+  const file = event.target.files[0];
+  if (file) uploadMedia('trigger2', file);
 };
 
-getElement('trigger').onclick = () => sendCommand('toggle');
+getElement('trigger1').onclick = () => sendCommand('toggle', { index: 1 });
+getElement('trigger2').onclick = () => sendCommand('toggle', { index: 2 });
 getElement('test').onclick = () => sendCommand('test', { on: !outputStatus.test });
 getElement('mirror').onclick = () => {
   const isMirrored = !controllerState.mirrorHorizontal;
@@ -314,6 +328,12 @@ getElement('vol').oninput = event => {
   sendCommand('volume', { v: volume });
   getElement('vol').title = parseInt(volume  * 100); 
 };
+getElement('triggerVol').oninput = event => {
+  const volume = +event.target.value;
+  store.setState({ triggerVolume: volume });
+  sendCommand('triggerVolume', { v: volume });
+  getElement('triggerVol').title = `${parseInt(volume * 100)}%`;
+};
 
 getElement('triggerDelay').value = controllerState.triggerDelay;
 getElement('triggerDelay').oninput = event => {
@@ -321,14 +341,6 @@ getElement('triggerDelay').oninput = event => {
   store.setState({ triggerDelay: delaySec });
   sendCommand('triggerDelay', { s: delaySec });
   getElement('triggerDelayLabel').innerText = "Video delay (" + delaySec + ")";
-};
-
-getElement('loopVideoTriggerDelay').value = controllerState.loopVideoTriggerDelay;
-getElement('loopVideoTriggerDelay').oninput = event => {
-  const delaySec = Number(event.target.value) || 0;
-  store.setState({ loopVideoTriggerDelay: delaySec });
-  sendCommand('loopVideoTriggerDelay', { s: delaySec });
-  getElement('loopVideoTriggerDelayLabel').innerText = `Video delay (${delaySec})`;
 };
 
 getElement('seek').addEventListener('pointerdown', () => {
@@ -347,10 +359,10 @@ getElement('out-status').onclick = () => {
   window.open('output.html', 'pm-output', 'popup,width=960,height=540');
 };
 
-window.addEventListener('projectionmapper:trigger', () => sendCommand('trigger'));
+window.addEventListener('projectionmapper:trigger', () => sendCommand('trigger', { index: 1 }));
 window.addEventListener('projectionmapper:toggle', () => sendCommand('toggle'));
 window.projectionMapper = {
-  trigger: () => sendCommand('trigger'),
+  trigger: (index = 1) => sendCommand('trigger', { index }),
   loopVideoTrigger: () => sendCommand('loopVideoTrigger'),
   toggleTrigger: () => sendCommand('toggle'),
   skip: () => sendCommand('skip'),
@@ -364,14 +376,14 @@ window.projectionMapper = {
 window.addEventListener('keydown', event => {
   const isFormControl = /INPUT|SELECT|TEXTAREA/.test(event.target.tagName);
   if (
-    (event.key === 't' || event.key === 'T')
+    (event.key === '1' || event.key === '2')
     && !event.repeat
     && !event.ctrlKey
     && !event.metaKey
     && !event.altKey
     && !isFormControl
   ) {
-    sendCommand('toggle');
+    sendCommand('toggle', { index: Number(event.key) });
     event.preventDefault();
   }
 
@@ -390,6 +402,8 @@ getElement('mirror').setAttribute('aria-pressed', String(controllerState.mirrorH
 updateVideoRotationButton();
 getElement('vol').value = controllerState.volume;
 getElement('vol').title = parseInt(controllerState.volume  * 100);
+getElement('triggerVol').value = controllerState.triggerVolume;
+getElement('triggerVol').title = `${parseInt(controllerState.triggerVolume * 100)}%`;
 setToggle('triggerTransparency', controllerState.triggerTransparency);
 getElement('triggerTransparency').setAttribute(
   'aria-pressed',
@@ -397,8 +411,6 @@ getElement('triggerTransparency').setAttribute(
 );
 getElement('triggerDelayLabel').innerText =
   `Video delay (${controllerState.triggerDelay})`;
-getElement('loopVideoTriggerDelayLabel').innerText =
-  `Video delay (${controllerState.loopVideoTriggerDelay})`;
 getElement('loop').disabled = loopVideoSensorConfigured;
 getElement('loop').title = loopVideoSensorConfigured
   ? 'Loop video sensor is configured; loop playback is disabled'
